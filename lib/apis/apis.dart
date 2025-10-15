@@ -1,99 +1,50 @@
-import 'dart:convert';
 import 'dart:developer';
-
 import 'package:google_generative_ai/google_generative_ai.dart';
-import 'package:http/http.dart';
-import 'package:translator_plus/translator_plus.dart';
 
 import '../helper/global.dart';
 
 class APIs {
-  //get answer from google gemini ai
+  /// 从Google Gemini AI获取回答
   static Future<String> getAnswer(String question) async {
     try {
-      log('api key: $apiKey');
+      log('正在调用AI接口，API Key: ${apiKey.substring(0, 10)}...');
 
       final model = GenerativeModel(
         model: 'gemini-1.5-flash-latest',
         apiKey: apiKey,
       );
 
-      final content = [Content.text(question)];
-      final res = await model.generateContent(content, safetySettings: [
-        SafetySetting(HarmCategory.dangerousContent, HarmBlockThreshold.none),
-        SafetySetting(HarmCategory.sexuallyExplicit, HarmBlockThreshold.none),
-        SafetySetting(HarmCategory.harassment, HarmBlockThreshold.none),
-        SafetySetting(HarmCategory.hateSpeech, HarmBlockThreshold.none),
-      ]);
+      // 添加系统提示，让AI更好地支持中文和Markdown格式
+      final prompt = '''
+你是一个友好、专业的AI助手。请用中文回答用户的问题。
+在回答时，你可以使用Markdown格式来让内容更清晰易读，包括：
+- 使用**粗体**强调重点
+- 使用`代码`标记技术术语
+- 使用```代码块```展示代码
+- 使用列表和标题组织内容
+- 使用>引用重要信息
 
-      log('res: ${res.text}');
+用户问题：$question
+''';
 
-      return res.text!;
+      final content = [Content.text(prompt)];
+      final res = await model.generateContent(
+        content,
+        safetySettings: [
+          SafetySetting(HarmCategory.dangerousContent, HarmBlockThreshold.none),
+          SafetySetting(HarmCategory.sexuallyExplicit, HarmBlockThreshold.none),
+          SafetySetting(HarmCategory.harassment, HarmBlockThreshold.none),
+          SafetySetting(HarmCategory.hateSpeech, HarmBlockThreshold.none),
+        ],
+      );
+
+      final answer = res.text ?? '抱歉，我无法生成回答。';
+      log('AI回答: ${answer.substring(0, answer.length > 100 ? 100 : answer.length)}...');
+
+      return answer;
     } catch (e) {
-      log('getAnswerGeminiE: $e');
-      return 'Something went wrong (Try again in sometime)';
-    }
-  }
-
-  //get answer from chat gpt
-  // static Future<String> getAnswer(String question) async {
-  //   try {
-  //     log('api key: $apiKey');
-
-  //     //
-  //     final res =
-  //         await post(Uri.parse('https://api.openai.com/v1/chat/completions'),
-
-  //             //headers
-  //             headers: {
-  //               HttpHeaders.contentTypeHeader: 'application/json',
-  //               HttpHeaders.authorizationHeader: 'Bearer $apiKey'
-  //             },
-
-  //             //body
-  //             body: jsonEncode({
-  //               "model": "gpt-3.5-turbo",
-  //               "max_tokens": 2000,
-  //               "temperature": 0,
-  //               "messages": [
-  //                 {"role": "user", "content": question},
-  //               ]
-  //             }));
-
-  //     final data = jsonDecode(res.body);
-
-  //     log('res: $data');
-  //     return data['choices'][0]['message']['content'];
-  //   } catch (e) {
-  //     log('getAnswerGptE: $e');
-  //     return 'Something went wrong (Try again in sometime)';
-  //   }
-  // }
-
-  static Future<List<String>> searchAiImages(String prompt) async {
-    try {
-      final res =
-          await get(Uri.parse('https://lexica.art/api/v1/search?q=$prompt'));
-
-      final data = jsonDecode(res.body);
-
-      //
-      return List.from(data['images']).map((e) => e['src'].toString()).toList();
-    } catch (e) {
-      log('searchAiImagesE: $e');
-      return [];
-    }
-  }
-
-  static Future<String> googleTranslate(
-      {required String from, required String to, required String text}) async {
-    try {
-      final res = await GoogleTranslator().translate(text, from: from, to: to);
-
-      return res.text;
-    } catch (e) {
-      log('googleTranslateE: $e ');
-      return 'Something went wrong!';
+      log('AI接口调用错误: $e');
+      return '抱歉，服务暂时不可用，请稍后重试。如果问题持续存在，请检查网络连接或API密钥配置。';
     }
   }
 }

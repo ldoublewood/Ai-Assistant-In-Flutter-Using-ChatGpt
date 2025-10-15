@@ -1,5 +1,5 @@
 name: ai_assistant
-description: An AI Assistant (ChatBot, Image Generator & Language Translator) App Based on ChatGPT developed by Harsh H. Rajpurohit 
+description: 一个极简的AI智能对话助手，支持Markdown格式显示和语音输入功能 
 
 publish_to: 'none' 
 
@@ -46,20 +46,17 @@ dependencies:
   # For API Call
   http: ^1.2.2
 
-  # For AI Image Generation
-  dart_openai: ^5.1.0
-  cached_network_image: ^3.3.1
-  
   # Google Gemini Ai Integration
   google_generative_ai: ^0.4.3
 
-  # For Google Language Translate
-  translator_plus: ^1.0.1
-
-  # For Saving Image to Gallery
-  photo_manager: ^3.0.0 # Latest version as of 2023-10-27, check pub.dev for updates.
-  # For Sharing Image
-  share_plus: ^12.0.0
+  # For Markdown Support
+  flutter_markdown: ^0.7.4+1
+  
+  # For Speech to Text
+  speech_to_text: ^7.0.0
+  
+  # For Audio Recording Permission
+  permission_handler: ^11.3.1
 
   # Facebook Ads
   easy_audience_network: ^0.0.6
