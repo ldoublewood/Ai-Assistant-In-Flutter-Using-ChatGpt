@@ -29,18 +29,49 @@ class ChatController extends GetxController {
 
   /// 初始化语音识别
   void _initSpeech() async {
-    speechEnabled.value = await _speechToText.initialize(
-      onError: (error) {
-        // 语音识别错误处理
-        isListening.value = false;
-      },
-      onStatus: (status) {
-        // 语音识别状态处理
-        if (status == 'done' || status == 'notListening') {
+    try {
+      // 首先检查设备是否支持语音识别
+      bool available = await _speechToText.hasPermission;
+      if (!available) {
+        print('语音识别：设备不支持或权限不足');
+        speechEnabled.value = false;
+        return;
+      }
+
+      // 初始化语音识别服务
+      speechEnabled.value = await _speechToText.initialize(
+        onError: (error) {
+          print('语音识别错误: ${error.errorMsg}');
           isListening.value = false;
-        }
-      },
-    );
+          // 根据错误类型给出具体提示
+          if (error.errorMsg.contains('network')) {
+            MyDialog.info('网络连接异常，请检查网络设置');
+          } else if (error.errorMsg.contains('permission')) {
+            MyDialog.info('麦克风权限被拒绝，请在设置中开启权限');
+          }
+        },
+        onStatus: (status) {
+          print('语音识别状态: $status');
+          // 语音识别状态处理
+          if (status == 'done' || status == 'notListening') {
+            isListening.value = false;
+          }
+        },
+        debugLogging: true, // 开启调试日志
+      );
+
+      if (speechEnabled.value) {
+        print('语音识别初始化成功');
+        // 检查可用的语言
+        var locales = await _speechToText.locales();
+        print('支持的语言: ${locales.map((l) => l.localeId).join(', ')}');
+      } else {
+        print('语音识别初始化失败');
+      }
+    } catch (e) {
+      print('语音识别初始化异常: $e');
+      speechEnabled.value = false;
+    }
   }
 
   /// 开始语音识别
