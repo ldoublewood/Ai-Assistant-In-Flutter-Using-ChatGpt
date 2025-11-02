@@ -76,32 +76,68 @@ class ChatController extends GetxController {
 
   /// 开始语音识别
   Future<void> startListening() async {
-    // 检查麦克风权限
-    var status = await Permission.microphone.request();
-    if (status != PermissionStatus.granted) {
-      MyDialog.info('需要麦克风权限才能使用语音输入功能');
-      return;
-    }
+    try {
+      // 检查麦克风权限
+      var status = await Permission.microphone.request();
+      if (status != PermissionStatus.granted) {
+        MyDialog.info('需要麦克风权限才能使用语音输入功能，请在设置中开启麦克风权限');
+        return;
+      }
 
-    if (!speechEnabled.value) {
-      MyDialog.info('语音识别功能不可用');
-      return;
-    }
-
-    if (!isListening.value) {
-      isListening.value = true;
-      recognizedText.value = '';
-      
-      await _speechToText.listen(
-        onResult: (result) {
-          recognizedText.value = result.recognizedWords;
-          if (result.finalResult) {
-            textC.text = recognizedText.value;
-            isListening.value = false;
+      // 如果语音识别未初始化成功，尝试重新初始化
+      if (!speechEnabled.value) {
+        print('语音识别未启用，尝试重新初始化...');
+        await _initSpeech();
+        
+        if (!speechEnabled.value) {
+          // 检查具体原因
+          bool hasPermission = await _speechToText.hasPermission;
+          if (!hasPermission) {
+            MyDialog.info('设备不支持语音识别或权限不足，请检查设备设置');
+          } else {
+            MyDialog.info('语音识别服务不可用，请确保设备已安装语音识别服务');
           }
-        },
-        localeId: 'zh_CN', // 中文识别
-      );
+          return;
+        }
+      }
+
+      if (!isListening.value) {
+        isListening.value = true;
+        recognizedText.value = '';
+        
+        // 检查可用的语言并选择合适的
+        var locales = await _speechToText.locales();
+        String localeId = 'zh_CN';
+        
+        // 查找中文语言包
+        var chineseLocale = locales.firstWhere(
+          (locale) => locale.localeId.startsWith('zh'),
+          orElse: () => locales.isNotEmpty ? locales.first : null,
+        );
+        
+        if (chineseLocale != null) {
+          localeId = chineseLocale.localeId;
+          print('使用语言: $localeId');
+        }
+        
+        await _speechToText.listen(
+          onResult: (result) {
+            recognizedText.value = result.recognizedWords;
+            print('识别结果: ${result.recognizedWords}');
+            if (result.finalResult) {
+              textC.text = recognizedText.value;
+              isListening.value = false;
+            }
+          },
+          localeId: localeId,
+          listenFor: const Duration(seconds: 30), // 最长监听30秒
+          pauseFor: const Duration(seconds: 3),   // 暂停3秒后停止
+        );
+      }
+    } catch (e) {
+      print('开始语音识别异常: $e');
+      isListening.value = false;
+      MyDialog.info('启动语音识别失败，请重试');
     }
   }
 
@@ -152,6 +188,34 @@ class ChatController extends GetxController {
         );
       }
     });
+  }
+
+  /// 检查语音识别可用性
+  Future<void> checkSpeechAvailability() async {
+    try {
+      bool available = await _speechToText.hasPermission;
+      var locales = await _speechToText.locales();
+      
+      print('=== 语音识别状态检查 ===');
+      print('权限状态: $available');
+      print('初始化状态: ${speechEnabled.value}');
+      print('支持的语言数量: ${locales.length}');
+      print('支持的语言: ${locales.map((l) => '${l.name}(${l.localeId})').join(', ')}');
+      print('========================');
+      
+      if (!available) {
+        MyDialog.info('设备不支持语音识别功能');
+      } else if (locales.isEmpty) {
+        MyDialog.info('未找到可用的语音识别语言包');
+      } else if (!speechEnabled.value) {
+        MyDialog.info('语音识别服务初始化失败，请重启应用重试');
+      } else {
+        MyDialog.info('语音识别功能正常，支持${locales.length}种语言');
+      }
+    } catch (e) {
+      print('检查语音识别可用性异常: $e');
+      MyDialog.info('检查语音识别功能时出错: $e');
+    }
   }
 
   @override
