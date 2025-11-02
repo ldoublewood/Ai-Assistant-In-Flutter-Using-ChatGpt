@@ -52,11 +52,14 @@ dependencies:
   # For Markdown Support
   flutter_markdown: ^0.7.4+1
   
-  # For Speech to Text
+  # For Speech to Text (本地语音识别，已屏蔽但保留用于录音)
   speech_to_text: ^7.0.0
   
   # For Audio Recording Permission
   permission_handler: ^11.3.1
+  
+  # For Audio Recording (可选，用于获取音频文件)
+  # flutter_sound: ^9.2.13
 
   # Facebook Ads
   easy_audience_network: ^0.0.6

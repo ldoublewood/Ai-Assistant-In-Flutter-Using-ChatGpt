@@ -1,0 +1,168 @@
+import 'dart:convert';
+import 'dart:developer';
+import 'dart:io';
+import 'package:http/http.dart' as http;
+
+/// 远程语音识别服务类，基于SenseVoice-Api
+class RemoteVoiceService {
+  // SenseVoice-Api默认端口是9880
+  static const String _defaultBaseUrl = 'http://localhost:9880';
+  static String _baseUrl = _defaultBaseUrl;
+  
+  /// 设置服务器地址
+  static void setBaseUrl(String url) {
+    _baseUrl = url.endsWith('/') ? url.substring(0, url.length - 1) : url;
+    log('远程语音识别服务地址设置为: $_baseUrl');
+  }
+  
+  /// 获取当前服务器地址
+  static String get baseUrl => _baseUrl;
+  
+  /// 将音频文件发送到SenseVoice服务器进行语音识别
+  /// [audioPath] 音频文件路径
+  /// [language] 识别语言，默认为auto自动检测
+  /// 返回识别出的文字内容
+  static Future<String> speechToText(String audioPath, {String language = 'auto'}) async {
+    try {
+      log('开始远程语音识别，音频文件路径: $audioPath');
+      log('使用服务器地址: $_baseUrl');
+      
+      // 检查文件是否存在
+      final audioFile = File(audioPath);
+      if (!await audioFile.exists()) {
+        log('音频文件不存在: $audioPath');
+        return '音频文件不存在';
+      }
+      
+      // 检查文件大小（SenseVoice建议不超过30MB）
+      final fileSize = await audioFile.length();
+      if (fileSize > 30 * 1024 * 1024) {
+        log('音频文件过大: ${fileSize / 1024 / 1024}MB');
+        return '音频文件过大，请使用小于30MB的文件';
+      }
+      
+      var request = http.MultipartRequest(
+        'POST',
+        Uri.parse('$_baseUrl/asr'),
+      );
+      
+      // 添加音频文件
+      request.files.add(
+        await http.MultipartFile.fromPath('audio', audioPath),
+      );
+      
+      // 添加其他参数
+      request.fields['language'] = language;
+      request.fields['output_format'] = 'json';
+      
+      log('发送请求到: $_baseUrl/asr');
+      log('请求参数: language=$language, output_format=json');
+      
+      var response = await request.send().timeout(
+        const Duration(seconds: 30), // 30秒超时
+      );
+      var responseData = await response.stream.bytesToString();
+      
+      log('响应状态码: ${response.statusCode}');
+      log('响应数据: $responseData');
+      
+      if (response.statusCode == 200) {
+        try {
+          var jsonData = json.decode(responseData);
+          
+          // 检查SenseVoice API的响应格式
+          if (jsonData['code'] == 0 && jsonData['data'] != null) {
+            String recognizedText = jsonData['data']['text'] ?? '';
+            String detectedLanguage = jsonData['data']['language'] ?? 'unknown';
+            double duration = (jsonData['data']['duration'] ?? 0.0).toDouble();
+            
+            log('语音识别成功: $recognizedText');
+            log('检测到的语言: $detectedLanguage');
+            log('音频时长: ${duration}秒');
+            
+            return recognizedText.isNotEmpty ? recognizedText : '未识别到语音内容';
+          } else {
+            String errorMsg = jsonData['message'] ?? '未知错误';
+            log('语音识别失败: $errorMsg');
+            return '语音识别失败: $errorMsg';
+          }
+        } catch (e) {
+          log('解析响应数据失败: $e');
+          return '服务器响应格式错误';
+        }
+      } else {
+        log('语音识别失败，状态码: ${response.statusCode}');
+        log('错误响应: $responseData');
+        
+        // 尝试解析错误信息
+        try {
+          var errorData = json.decode(responseData);
+          String errorMsg = errorData['message'] ?? '未知错误';
+          return '语音识别失败: $errorMsg';
+        } catch (e) {
+          return '语音识别失败，服务器错误 (${response.statusCode})';
+        }
+      }
+    } catch (e) {
+      log('语音识别异常: $e');
+      if (e.toString().contains('TimeoutException')) {
+        return '语音识别超时，请检查网络连接或服务器状态';
+      } else if (e.toString().contains('SocketException')) {
+        return '无法连接到语音识别服务器，请检查服务器地址和网络连接';
+      } else {
+        return '语音识别出错: ${e.toString()}';
+      }
+    }
+  }
+  
+  /// 检查SenseVoice服务器连接状态
+  static Future<bool> checkServerConnection() async {
+    try {
+      log('检查SenseVoice服务器连接: $_baseUrl');
+      
+      var response = await http.get(
+        Uri.parse('$_baseUrl/health'),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(const Duration(seconds: 5));
+      
+      log('健康检查响应状态码: ${response.statusCode}');
+      log('健康检查响应内容: ${response.body}');
+      
+      if (response.statusCode == 200) {
+        try {
+          var jsonData = json.decode(response.body);
+          log('SenseVoice服务器状态: ${jsonData['status']}');
+          log('SenseVoice版本: ${jsonData['version']}');
+          log('使用模型: ${jsonData['model']}');
+          return true;
+        } catch (e) {
+          log('解析健康检查响应失败: $e');
+          return response.statusCode == 200;
+        }
+      } else {
+        log('SenseVoice服务器健康检查失败，状态码: ${response.statusCode}');
+        return false;
+      }
+    } catch (e) {
+      log('SenseVoice服务器连接检查失败: $e');
+      return false;
+    }
+  }
+  
+  /// 获取服务器信息
+  static Future<Map<String, dynamic>?> getServerInfo() async {
+    try {
+      var response = await http.get(
+        Uri.parse('$_baseUrl/health'),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(const Duration(seconds: 5));
+      
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      }
+    } catch (e) {
+      log('获取服务器信息失败: $e');
+    }
+    return null;
+  }
+}

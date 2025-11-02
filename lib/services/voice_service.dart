@@ -1,61 +1,64 @@
-import 'dart:convert';
 import 'dart:developer';
-import 'package:http/http.dart' as http;
+import 'remote_voice_service.dart';
+import 'voice_config.dart';
 
-/// 语音服务类，用于处理语音转文字功能
+/// 语音服务统一接口类，支持本地和远程语音识别
 class VoiceService {
-  static const String _baseUrl = 'http://your-server-url.com/api'; // 替换为实际的服务器地址
-  
-  /// 将音频文件发送到服务器进行语音识别
+  /// 将音频文件进行语音识别
   /// [audioPath] 音频文件路径
   /// 返回识别出的文字内容
   static Future<String> speechToText(String audioPath) async {
     try {
       log('开始语音识别，音频文件路径: $audioPath');
+      log('使用${VoiceConfig.useRemoteVoice ? "远程" : "本地"}语音识别');
       
-      var request = http.MultipartRequest(
-        'POST',
-        Uri.parse('$_baseUrl/speech-to-text'),
-      );
-      
-      // 添加音频文件
-      request.files.add(
-        await http.MultipartFile.fromPath('audio', audioPath),
-      );
-      
-      // 添加其他参数
-      request.fields['language'] = 'zh-CN'; // 中文识别
-      
-      var response = await request.send();
-      var responseData = await response.stream.bytesToString();
-      
-      if (response.statusCode == 200) {
-        var jsonData = json.decode(responseData);
-        String recognizedText = jsonData['text'] ?? '';
-        log('语音识别成功: $recognizedText');
-        return recognizedText;
+      if (VoiceConfig.useRemoteVoice) {
+        // 使用远程语音识别
+        RemoteVoiceService.setBaseUrl(VoiceConfig.remoteVoiceUrl);
+        return await RemoteVoiceService.speechToText(
+          audioPath,
+          language: VoiceConfig.voiceLanguage,
+        );
       } else {
-        log('语音识别失败，状态码: ${response.statusCode}');
-        return '语音识别失败，请重试';
+        // 本地语音识别已被屏蔽，提示用户
+        log('本地语音识别已被禁用');
+        return '本地语音识别功能已禁用，请在设置中启用远程语音识别';
       }
     } catch (e) {
       log('语音识别异常: $e');
-      return '语音识别出错，请检查网络连接';
+      return '语音识别出错: ${e.toString()}';
     }
   }
   
-  /// 检查服务器连接状态
+  /// 检查语音识别服务连接状态
   static Future<bool> checkServerConnection() async {
     try {
-      var response = await http.get(
-        Uri.parse('$_baseUrl/health'),
-        headers: {'Content-Type': 'application/json'},
-      ).timeout(const Duration(seconds: 5));
-      
-      return response.statusCode == 200;
+      if (VoiceConfig.useRemoteVoice) {
+        // 检查远程服务器连接
+        RemoteVoiceService.setBaseUrl(VoiceConfig.remoteVoiceUrl);
+        return await RemoteVoiceService.checkServerConnection();
+      } else {
+        // 本地语音识别已被屏蔽
+        log('本地语音识别已被禁用');
+        return false;
+      }
     } catch (e) {
       log('服务器连接检查失败: $e');
       return false;
     }
+  }
+  
+  /// 获取当前语音识别配置信息
+  static Map<String, dynamic> getConfigInfo() {
+    return VoiceConfig.getAllConfig();
+  }
+  
+  /// 获取服务器信息（仅远程模式）
+  static Future<Map<String, dynamic>?> getServerInfo() async {
+    if (VoiceConfig.useRemoteVoice) {
+      RemoteVoiceService.setBaseUrl(VoiceConfig.remoteVoiceUrl);
+      return await RemoteVoiceService.getServerInfo();
+    }
+    return null;
   }
 }

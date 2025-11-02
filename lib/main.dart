@@ -7,6 +7,7 @@ import 'helper/ad_helper.dart';
 import 'helper/global.dart';
 import 'helper/pref.dart';
 import 'screen/splash_screen.dart';
+import 'screen/voice_settings_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -37,6 +38,14 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
 
       themeMode: Pref.defaultTheme,
+
+      // 路由配置
+      getPages: [
+        GetPage(
+          name: '/voice-settings',
+          page: () => const VoiceSettingsScreen(),
+        ),
+      ],
 
       //dark
       darkTheme: ThemeData(

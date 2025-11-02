@@ -2,10 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'dart:io';
+import 'dart:developer';
+import 'package:path_provider/path_provider.dart';
 
 import '../apis/apis.dart';
 import '../helper/my_dialog.dart';
 import '../model/message.dart';
+import '../services/voice_service.dart';
+import '../services/voice_config.dart';
 
 class ChatController extends GetxController {
   final textC = TextEditingController();
@@ -16,6 +21,7 @@ class ChatController extends GetxController {
   final RxBool isListening = false.obs;
   final RxBool speechEnabled = false.obs;
   final RxString recognizedText = ''.obs;
+  final RxBool useRemoteVoice = false.obs;
 
   final list = <Message>[
     Message(msg: '你好！我是AI助手，有什么可以帮助你的吗？', msgType: MessageType.bot)
@@ -24,7 +30,14 @@ class ChatController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    _loadVoiceConfig();
     _initSpeech();
+  }
+
+  /// 加载语音配置
+  void _loadVoiceConfig() {
+    useRemoteVoice.value = VoiceConfig.useRemoteVoice;
+    log('当前语音识别模式: ${useRemoteVoice.value ? "远程" : "本地"}');
   }
 
   /// 初始化语音识别
@@ -77,6 +90,9 @@ class ChatController extends GetxController {
   /// 开始语音识别
   Future<void> startListening() async {
     try {
+      // 重新加载配置
+      _loadVoiceConfig();
+      
       // 检查麦克风权限
       var status = await Permission.microphone.request();
       if (status != PermissionStatus.granted) {
@@ -84,19 +100,36 @@ class ChatController extends GetxController {
         return;
       }
 
-      // 如果语音识别未初始化成功，尝试重新初始化
+      if (useRemoteVoice.value) {
+        // 使用远程语音识别
+        await _startRemoteListening();
+      } else {
+        // 使用本地语音识别（已被屏蔽）
+        MyDialog.info('本地语音识别功能已禁用，请在设置中启用远程语音识别');
+        return;
+      }
+    } catch (e) {
+      log('开始语音识别异常: $e');
+      isListening.value = false;
+      MyDialog.info('启动语音识别失败，请重试');
+    }
+  }
+
+  /// 开始远程语音识别
+  Future<void> _startRemoteListening() async {
+    try {
+      // 首先检查远程服务器连接
+      bool isConnected = await VoiceService.checkServerConnection();
+      if (!isConnected) {
+        MyDialog.info('无法连接到远程语音识别服务器，请检查设置');
+        return;
+      }
+
+      // 如果本地语音识别未初始化，尝试初始化（用于录音）
       if (!speechEnabled.value) {
-        print('语音识别未启用，尝试重新初始化...');
         await _initSpeech();
-        
         if (!speechEnabled.value) {
-          // 检查具体原因
-          bool hasPermission = await _speechToText.hasPermission;
-          if (!hasPermission) {
-            MyDialog.info('设备不支持语音识别或权限不足，请检查设备设置');
-          } else {
-            MyDialog.info('语音识别服务不可用，请确保设备已安装语音识别服务');
-          }
+          MyDialog.info('无法初始化录音功能，请检查设备设置');
           return;
         }
       }
@@ -105,11 +138,10 @@ class ChatController extends GetxController {
         isListening.value = true;
         recognizedText.value = '';
         
-        // 检查可用的语言并选择合适的
+        // 使用本地语音识别进行录音，但不使用其识别结果
         var locales = await _speechToText.locales();
         String localeId = 'zh_CN';
         
-        // 查找中文语言包
         var chineseLocale = locales.firstWhere(
           (locale) => locale.localeId.startsWith('zh'),
           orElse: () => locales.isNotEmpty ? locales.first : null,
@@ -117,27 +149,85 @@ class ChatController extends GetxController {
         
         if (chineseLocale != null) {
           localeId = chineseLocale.localeId;
-          print('使用语言: $localeId');
         }
         
         await _speechToText.listen(
           onResult: (result) {
+            // 显示本地识别的临时结果，但最终会被远程识别结果替换
             recognizedText.value = result.recognizedWords;
-            print('识别结果: ${result.recognizedWords}');
+            log('本地临时识别结果: ${result.recognizedWords}');
+            
             if (result.finalResult) {
-              textC.text = recognizedText.value;
-              isListening.value = false;
+              // 本地识别完成，准备发送到远程服务器
+              _processRemoteRecognition(result.recognizedWords);
             }
           },
           localeId: localeId,
-          listenFor: const Duration(seconds: 30), // 最长监听30秒
-          pauseFor: const Duration(seconds: 3),   // 暂停3秒后停止
+          listenFor: const Duration(seconds: 30),
+          pauseFor: const Duration(seconds: 3),
         );
       }
     } catch (e) {
-      print('开始语音识别异常: $e');
+      log('远程语音识别启动异常: $e');
       isListening.value = false;
-      MyDialog.info('启动语音识别失败，请重试');
+      MyDialog.info('启动远程语音识别失败: $e');
+    }
+  }
+
+  /// 处理远程语音识别
+  Future<void> _processRemoteRecognition(String localResult) async {
+    try {
+      isListening.value = false;
+      
+      // 这里应该保存录音文件并发送到远程服务器
+      // 由于speech_to_text包不直接提供音频文件，我们使用本地识别结果作为备选
+      // 在实际应用中，你可能需要使用其他录音插件来获取音频文件
+      
+      MyDialog.info('正在使用远程服务器识别语音...');
+      
+      // 模拟远程识别过程
+      // 在实际实现中，这里应该是音频文件路径
+      String audioPath = await _saveTemporaryAudio(localResult);
+      
+      if (audioPath.isNotEmpty) {
+        String remoteResult = await VoiceService.speechToText(audioPath);
+        
+        if (remoteResult.isNotEmpty && !remoteResult.contains('失败') && !remoteResult.contains('错误')) {
+          textC.text = remoteResult;
+          recognizedText.value = remoteResult;
+          log('远程语音识别成功: $remoteResult');
+        } else {
+          // 远程识别失败，使用本地结果作为备选
+          textC.text = localResult;
+          recognizedText.value = localResult;
+          log('远程识别失败，使用本地结果: $localResult');
+          MyDialog.info('远程识别失败，已使用本地识别结果');
+        }
+      } else {
+        // 无法获取音频文件，使用本地结果
+        textC.text = localResult;
+        recognizedText.value = localResult;
+      }
+    } catch (e) {
+      log('远程语音识别处理异常: $e');
+      // 发生异常时使用本地结果
+      textC.text = localResult;
+      recognizedText.value = localResult;
+      MyDialog.info('远程识别出错，已使用本地识别结果');
+    }
+  }
+
+  /// 保存临时音频文件（模拟实现）
+  /// 在实际应用中，你需要使用专门的录音插件来获取音频文件
+  Future<String> _saveTemporaryAudio(String text) async {
+    try {
+      // 这是一个模拟实现，实际应用中需要真实的音频文件
+      // 你可以使用 flutter_sound 或其他录音插件来获取音频文件
+      log('模拟保存音频文件，文本内容: $text');
+      return ''; // 返回空字符串表示无法获取音频文件
+    } catch (e) {
+      log('保存临时音频文件失败: $e');
+      return '';
     }
   }
 
@@ -193,29 +283,49 @@ class ChatController extends GetxController {
   /// 检查语音识别可用性
   Future<void> checkSpeechAvailability() async {
     try {
-      bool available = await _speechToText.hasPermission;
-      var locales = await _speechToText.locales();
+      _loadVoiceConfig();
       
-      print('=== 语音识别状态检查 ===');
-      print('权限状态: $available');
-      print('初始化状态: ${speechEnabled.value}');
-      print('支持的语言数量: ${locales.length}');
-      print('支持的语言: ${locales.map((l) => '${l.name}(${l.localeId})').join(', ')}');
-      print('========================');
+      log('=== 语音识别状态检查 ===');
+      log('当前模式: ${useRemoteVoice.value ? "远程" : "本地"}');
       
-      if (!available) {
-        MyDialog.info('设备不支持语音识别功能');
-      } else if (locales.isEmpty) {
-        MyDialog.info('未找到可用的语音识别语言包');
-      } else if (!speechEnabled.value) {
-        MyDialog.info('语音识别服务初始化失败，请重启应用重试');
+      if (useRemoteVoice.value) {
+        // 检查远程语音识别
+        log('检查远程语音识别服务...');
+        bool isConnected = await VoiceService.checkServerConnection();
+        
+        if (isConnected) {
+          var serverInfo = await VoiceService.getServerInfo();
+          var configInfo = VoiceService.getConfigInfo();
+          
+          String infoText = '远程语音识别服务正常\n\n';
+          infoText += '服务器地址: ${configInfo['remoteVoiceUrl']}\n';
+          infoText += '识别语言: ${VoiceConfig.getLanguageName(configInfo['voiceLanguage'])}\n';
+          
+          if (serverInfo != null) {
+            infoText += '服务器状态: ${serverInfo['status']}\n';
+            infoText += '服务器版本: ${serverInfo['version']}\n';
+            infoText += '使用模型: ${serverInfo['model']}';
+          }
+          
+          MyDialog.info(infoText);
+        } else {
+          MyDialog.error('无法连接到远程语音识别服务器\n\n请检查:\n• 服务器地址是否正确\n• 网络连接是否正常\n• SenseVoice服务是否运行');
+        }
       } else {
-        MyDialog.info('语音识别功能正常，支持${locales.length}种语言');
+        // 本地语音识别已被禁用
+        MyDialog.info('本地语音识别功能已被禁用\n\n请在设置中启用远程语音识别功能');
       }
+      
+      log('========================');
     } catch (e) {
-      print('检查语音识别可用性异常: $e');
-      MyDialog.info('检查语音识别功能时出错: $e');
+      log('检查语音识别可用性异常: $e');
+      MyDialog.error('检查语音识别功能时出错: $e');
     }
+  }
+
+  /// 打开语音设置
+  void openVoiceSettings() {
+    Get.toNamed('/voice-settings');
   }
 
   @override

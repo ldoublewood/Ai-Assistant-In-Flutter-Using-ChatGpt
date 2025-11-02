@@ -25,6 +25,12 @@ class _ChatBotFeatureState extends State<ChatBotFeature> {
         centerTitle: true,
         elevation: 1,
         actions: [
+          // 语音设置按钮
+          IconButton(
+            onPressed: () => _c.openVoiceSettings(),
+            icon: const Icon(Icons.settings_voice, size: 20),
+            tooltip: '语音设置',
+          ),
           // 语音调试按钮
           IconButton(
             onPressed: () => _c.checkSpeechAvailability(),
