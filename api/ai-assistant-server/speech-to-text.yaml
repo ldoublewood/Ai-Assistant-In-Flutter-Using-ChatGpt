@@ -107,28 +107,28 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /health:
-    get:
-      summary: 健康检查
-      description: 检查SenseVoice服务状态
-      operationId: healthCheck
-      responses:
-        '200':
-          description: 服务正常
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    example: "healthy"
-                  version:
-                    type: string
-                    example: "1.0.0"
-                  model:
-                    type: string
-                    example: "SenseVoice"
+#   /health:
+#     get:
+#       summary: 健康检查
+#       description: 检查SenseVoice服务状态
+#       operationId: healthCheck
+#       responses:
+#         '200':
+#           description: 服务正常
+#           content:
+#             application/json:
+#               schema:
+#                 type: object
+#                 properties:
+#                   status:
+#                     type: string
+#                     example: "healthy"
+#                   version:
+#                     type: string
+#                     example: "1.0.0"
+#                   model:
+#                     type: string
+#                     example: "SenseVoice"
 
 components:
   schemas:

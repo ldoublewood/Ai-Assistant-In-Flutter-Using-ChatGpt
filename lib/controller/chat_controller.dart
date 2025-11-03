@@ -307,6 +307,8 @@ class ChatController extends GetxController {
             infoText += '服务器状态: ${serverInfo['status']}\n';
             infoText += '服务器版本: ${serverInfo['version']}\n';
             infoText += '使用模型: ${serverInfo['model']}';
+          } else {
+            infoText += '注意: 服务器详细信息暂时不可用\n(health接口暂时被屏蔽)';
           }
           
           MyDialog.info(infoText);

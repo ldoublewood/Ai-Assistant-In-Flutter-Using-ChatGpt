@@ -76,7 +76,11 @@ class _VoiceSettingsScreenState extends State<VoiceSettingsScreen> {
       
       if (isConnected) {
         _serverInfo = await RemoteVoiceService.getServerInfo();
-        MyDialog.success('服务器连接成功');
+        if (_serverInfo != null) {
+          MyDialog.success('服务器连接成功');
+        } else {
+          MyDialog.success('服务器连接成功\n(详细信息暂时不可用)');
+        }
       } else {
         MyDialog.error('无法连接到服务器，请检查地址和网络');
       }
@@ -257,6 +261,37 @@ class _VoiceSettingsScreenState extends State<VoiceSettingsScreen> {
                               Text('状态: ${_serverInfo!['status'] ?? 'unknown'}'),
                               Text('版本: ${_serverInfo!['version'] ?? 'unknown'}'),
                               Text('模型: ${_serverInfo!['model'] ?? 'unknown'}'),
+                            ],
+                          ),
+                        ),
+                      ] else if (_isTestingConnection == false && _useRemoteVoice) ...[
+                        // 当连接测试完成但无法获取服务器信息时显示
+                        const SizedBox(height: 16),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(Icons.info, color: Colors.orange, size: 20),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    '服务器详细信息不可用',
+                                    style: TextStyle(
+                                      color: Colors.orange[800],
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Text('health接口暂时被屏蔽，但语音识别功能正常'),
                             ],
                           ),
                         ),

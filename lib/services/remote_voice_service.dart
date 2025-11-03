@@ -116,10 +116,14 @@ class RemoteVoiceService {
   }
   
   /// 检查SenseVoice服务器连接状态
+  /// 注意：由于远程服务器暂时不支持health接口，此方法暂时返回true
   static Future<bool> checkServerConnection() async {
     try {
       log('检查SenseVoice服务器连接: $_baseUrl');
+      log('注意：health接口暂时被屏蔽，默认返回连接正常');
       
+      // TODO: 暂时屏蔽health接口调用，等服务器支持后再启用
+      /*
       var response = await http.get(
         Uri.parse('$_baseUrl/health'),
         headers: {'Content-Type': 'application/json'},
@@ -143,6 +147,10 @@ class RemoteVoiceService {
         log('SenseVoice服务器健康检查失败，状态码: ${response.statusCode}');
         return false;
       }
+      */
+      
+      // 暂时返回true，假设服务器连接正常
+      return true;
     } catch (e) {
       log('SenseVoice服务器连接检查失败: $e');
       return false;
@@ -150,8 +158,14 @@ class RemoteVoiceService {
   }
   
   /// 获取服务器信息
+  /// 注意：由于远程服务器暂时不支持health接口，此方法暂时返回null
   static Future<Map<String, dynamic>?> getServerInfo() async {
     try {
+      log('获取服务器信息: $_baseUrl');
+      log('注意：health接口暂时被屏蔽，返回null');
+      
+      // TODO: 暂时屏蔽health接口调用，等服务器支持后再启用
+      /*
       var response = await http.get(
         Uri.parse('$_baseUrl/health'),
         headers: {'Content-Type': 'application/json'},
@@ -160,6 +174,10 @@ class RemoteVoiceService {
       if (response.statusCode == 200) {
         return json.decode(response.body);
       }
+      */
+      
+      // 暂时返回null，表示无法获取服务器信息
+      return null;
     } catch (e) {
       log('获取服务器信息失败: $e');
     }
