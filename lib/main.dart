@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import 'apis/app_write.dart';
-import 'helper/ad_helper.dart';
 import 'helper/global.dart';
 import 'helper/pref.dart';
 import 'screen/splash_screen.dart';
@@ -17,9 +16,6 @@ Future<void> main() async {
 
   // for app write initialization
   AppWrite.init();
-
-  // for initializing facebook ads sdk
-  AdHelper.init();
 
   await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   await SystemChrome.setPreferredOrientations(

@@ -61,8 +61,8 @@ dependencies:
   # For Audio Recording (可选，用于获取音频文件)
   # flutter_sound: ^9.2.13
 
-  # Facebook Ads
-  easy_audience_network: ^0.0.6
+  # Facebook Ads (已移除，项目中未使用)
+  # easy_audience_network: ^0.0.6
 
 dev_dependencies:
   flutter_test:
