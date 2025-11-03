@@ -78,9 +78,13 @@ class _ChatBotFeatureState extends State<ChatBotFeature> {
             children: [
               // 语音输入按钮
               Obx(() => GestureDetector(
-                onTapDown: (_) => _c.startListening(),
-                onTapUp: (_) => _c.stopListening(),
-                onTapCancel: () => _c.stopListening(),
+                onTap: () {
+                  if (_c.isListening.value) {
+                    _c.stopListening();
+                  } else {
+                    _c.startListening();
+                  }
+                },
                 child: Container(
                   width: 48,
                   height: 48,
@@ -95,7 +99,7 @@ class _ChatBotFeatureState extends State<ChatBotFeature> {
                     ),
                   ),
                   child: Icon(
-                    _c.isListening.value ? Icons.mic : Icons.mic_none,
+                    _c.isListening.value ? Icons.stop : Icons.mic_none,
                     color: _c.isListening.value ? Colors.red : Colors.blue,
                     size: 24,
                   ),
@@ -119,7 +123,7 @@ class _ChatBotFeatureState extends State<ChatBotFeature> {
                     textInputAction: TextInputAction.send,
                     onFieldSubmitted: (_) => _c.askQuestion(),
                     decoration: InputDecoration(
-                      hintText: '输入消息或长按语音输入...',
+                      hintText: '输入消息或点击语音按钮输入...',
                       hintStyle: TextStyle(
                         fontSize: 14,
                         color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6),
@@ -168,19 +172,37 @@ class _ChatBotFeatureState extends State<ChatBotFeature> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 color: Colors.red.withValues(alpha: 0.1),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                child: Column(
                   children: [
-                    Icon(Icons.mic, color: Colors.red, size: 16),
-                    SizedBox(width: 8),
-                    Text(
-                      '正在听取语音输入...',
-                      style: TextStyle(
-                        color: Colors.red,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.mic, color: Colors.red, size: 16),
+                        const SizedBox(width: 8),
+                        Text(
+                          '正在听取语音输入...',
+                          style: TextStyle(
+                            color: Colors.red,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
                     ),
+                    // 显示识别的文本
+                    if (_c.recognizedText.value.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          _c.recognizedText.value,
+                          style: TextStyle(
+                            color: Colors.red[700],
+                            fontSize: 12,
+                            fontStyle: FontStyle.italic,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
                   ],
                 ),
               ),

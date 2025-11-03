@@ -39,7 +39,7 @@ class ChatController extends GetxController {
   }
 
   /// 初始化语音识别
-  void _initSpeech() async {
+  Future<void> _initSpeech() async {
     try {
       // 首先检查设备是否支持语音识别
       bool available = await _speechToText.hasPermission;
@@ -53,19 +53,35 @@ class ChatController extends GetxController {
       speechEnabled.value = await _speechToText.initialize(
         onError: (error) {
           log('语音识别错误: ${error.errorMsg}');
-          isListening.value = false;
-          // 根据错误类型给出具体提示
-          if (error.errorMsg.contains('network')) {
-            MyDialog.info('网络连接异常，请检查网络设置');
-          } else if (error.errorMsg.contains('permission')) {
-            MyDialog.info('麦克风权限被拒绝，请在设置中开启权限');
+          // 只有在真正出现严重错误时才停止监听
+          if (error.errorMsg.contains('permission') || 
+              error.errorMsg.contains('not available') ||
+              error.errorMsg.contains('initialization')) {
+            isListening.value = false;
+            recognizedText.value = '';
+            // 根据错误类型给出具体提示
+            if (error.errorMsg.contains('network')) {
+              MyDialog.info('网络连接异常，请检查网络设置');
+            } else if (error.errorMsg.contains('permission')) {
+              MyDialog.info('麦克风权限被拒绝，请在设置中开启权限');
+            } else {
+              MyDialog.info('语音识别出现错误: ${error.errorMsg}');
+            }
           }
         },
         onStatus: (status) {
           log('语音识别状态: $status');
-          // 语音识别状态处理
-          if (status == 'done' || status == 'notListening') {
-            isListening.value = false;
+          // 语音识别状态处理 - 更精确的状态管理
+          if (status == 'done') {
+            // 识别完成，但不立即停止监听状态，等待处理结果
+            log('语音识别完成，等待处理结果...');
+          } else if (status == 'notListening') {
+            // 只有在用户主动停止或出现错误时才更新状态
+            if (!isListening.value) {
+              log('语音识别已停止');
+            }
+          } else if (status == 'listening') {
+            log('正在监听语音输入...');
           }
         },
         debugLogging: true, // 开启调试日志
@@ -87,13 +103,22 @@ class ChatController extends GetxController {
 
   /// 开始语音识别
   Future<void> startListening() async {
+    // 防止重复启动
+    if (isListening.value) {
+      return;
+    }
+
     try {
       // 重新加载配置
       _loadVoiceConfig();
       
+      // 先设置为正在监听状态，给用户即时反馈
+      isListening.value = true;
+      
       // 检查麦克风权限
       var status = await Permission.microphone.request();
       if (status != PermissionStatus.granted) {
+        isListening.value = false;
         MyDialog.info('需要麦克风权限才能使用语音输入功能，请在设置中开启麦克风权限');
         return;
       }
@@ -103,6 +128,7 @@ class ChatController extends GetxController {
         await _startRemoteListening();
       } else {
         // 使用本地语音识别（已被屏蔽）
+        isListening.value = false;
         MyDialog.info('本地语音识别功能已禁用，请在设置中启用远程语音识别');
         return;
       }
@@ -116,62 +142,73 @@ class ChatController extends GetxController {
   /// 开始远程语音识别
   Future<void> _startRemoteListening() async {
     try {
+      // 显示正在检查服务器连接的提示
+      recognizedText.value = '正在检查服务器连接...';
+      
       // 首先检查远程服务器连接
       bool isConnected = await VoiceService.checkServerConnection();
       if (!isConnected) {
+        isListening.value = false;
+        recognizedText.value = '';
         MyDialog.info('无法连接到远程语音识别服务器，请检查设置');
         return;
       }
 
+      // 显示正在初始化录音功能的提示
+      recognizedText.value = '正在初始化录音功能...';
+
       // 如果本地语音识别未初始化，尝试初始化（用于录音）
       if (!speechEnabled.value) {
-        _initSpeech();
+        await _initSpeech();
         // 等待一下让初始化完成
         await Future.delayed(const Duration(milliseconds: 500));
         if (!speechEnabled.value) {
+          isListening.value = false;
+          recognizedText.value = '';
           MyDialog.info('无法初始化录音功能，请检查设备设置');
           return;
         }
       }
 
-      if (!isListening.value) {
-        isListening.value = true;
-        recognizedText.value = '';
-        
-        // 使用本地语音识别进行录音，但不使用其识别结果
-        var locales = await _speechToText.locales();
-        String localeId = 'zh_CN';
-        
-        var chineseLocale = locales.isNotEmpty 
-            ? locales.firstWhere(
-                (locale) => locale.localeId.startsWith('zh'),
-                orElse: () => locales.first,
-              )
-            : null;
-        
-        if (chineseLocale != null) {
-          localeId = chineseLocale.localeId;
-        }
-        
-        await _speechToText.listen(
-          onResult: (result) {
-            // 显示本地识别的临时结果，但最终会被远程识别结果替换
-            recognizedText.value = result.recognizedWords;
-            log('本地临时识别结果: ${result.recognizedWords}');
-            
-            if (result.finalResult) {
-              // 本地识别完成，准备发送到远程服务器
-              _processRemoteRecognition(result.recognizedWords);
-            }
-          },
-          localeId: localeId,
-          listenFor: const Duration(seconds: 30),
-          pauseFor: const Duration(seconds: 3),
-        );
+      // 清空识别文本，准备开始录音
+      recognizedText.value = '请开始说话...';
+      
+      // 使用本地语音识别进行录音，但不使用其识别结果
+      var locales = await _speechToText.locales();
+      String localeId = 'zh_CN';
+      
+      var chineseLocale = locales.isNotEmpty 
+          ? locales.firstWhere(
+              (locale) => locale.localeId.startsWith('zh'),
+              orElse: () => locales.first,
+            )
+          : null;
+      
+      if (chineseLocale != null) {
+        localeId = chineseLocale.localeId;
       }
+      
+      await _speechToText.listen(
+        onResult: (result) {
+          // 显示本地识别的临时结果，但最终会被远程识别结果替换
+          recognizedText.value = result.recognizedWords.isEmpty 
+              ? '正在监听...' 
+              : result.recognizedWords;
+          log('本地临时识别结果: ${result.recognizedWords}');
+          
+          if (result.finalResult) {
+            // 本地识别完成，准备发送到远程服务器
+            _processRemoteRecognition(result.recognizedWords);
+          }
+        },
+        localeId: localeId,
+        listenFor: const Duration(seconds: 30),
+        pauseFor: const Duration(seconds: 3),
+      );
     } catch (e) {
       log('远程语音识别启动异常: $e');
       isListening.value = false;
+      recognizedText.value = '';
       MyDialog.info('启动远程语音识别失败: $e');
     }
   }
@@ -236,8 +273,16 @@ class ChatController extends GetxController {
   /// 停止语音识别
   Future<void> stopListening() async {
     if (isListening.value) {
-      await _speechToText.stop();
-      isListening.value = false;
+      try {
+        await _speechToText.stop();
+        isListening.value = false;
+        recognizedText.value = '';
+        log('语音识别已手动停止');
+      } catch (e) {
+        log('停止语音识别异常: $e');
+        isListening.value = false;
+        recognizedText.value = '';
+      }
     }
   }
 
