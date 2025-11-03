@@ -7,19 +7,19 @@ class MyDialog {
 //info
   static void info(String msg) {
     Get.snackbar('Info', msg,
-        backgroundColor: Colors.blue.withOpacity(.7), colorText: Colors.white);
+        backgroundColor: Colors.blue.withValues(alpha: 0.7), colorText: Colors.white);
   }
 
 //success
   static void success(String msg) {
     Get.snackbar('Success', msg,
-        backgroundColor: Colors.green.withOpacity(.7), colorText: Colors.white);
+        backgroundColor: Colors.green.withValues(alpha: 0.7), colorText: Colors.white);
   }
 
 //error
   static void error(String msg) {
     Get.snackbar('Error', msg,
-        backgroundColor: Colors.redAccent.withOpacity(.7),
+        backgroundColor: Colors.redAccent.withValues(alpha: 0.7),
         colorText: Colors.white);
   }
 

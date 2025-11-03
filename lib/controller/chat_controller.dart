@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'dart:io';
 import 'dart:developer';
-import 'package:path_provider/path_provider.dart';
 
 import '../apis/apis.dart';
 import '../helper/my_dialog.dart';
@@ -46,7 +44,7 @@ class ChatController extends GetxController {
       // 首先检查设备是否支持语音识别
       bool available = await _speechToText.hasPermission;
       if (!available) {
-        print('语音识别：设备不支持或权限不足');
+        log('语音识别：设备不支持或权限不足');
         speechEnabled.value = false;
         return;
       }
@@ -54,7 +52,7 @@ class ChatController extends GetxController {
       // 初始化语音识别服务
       speechEnabled.value = await _speechToText.initialize(
         onError: (error) {
-          print('语音识别错误: ${error.errorMsg}');
+          log('语音识别错误: ${error.errorMsg}');
           isListening.value = false;
           // 根据错误类型给出具体提示
           if (error.errorMsg.contains('network')) {
@@ -64,7 +62,7 @@ class ChatController extends GetxController {
           }
         },
         onStatus: (status) {
-          print('语音识别状态: $status');
+          log('语音识别状态: $status');
           // 语音识别状态处理
           if (status == 'done' || status == 'notListening') {
             isListening.value = false;
@@ -74,15 +72,15 @@ class ChatController extends GetxController {
       );
 
       if (speechEnabled.value) {
-        print('语音识别初始化成功');
+        log('语音识别初始化成功');
         // 检查可用的语言
         var locales = await _speechToText.locales();
-        print('支持的语言: ${locales.map((l) => l.localeId).join(', ')}');
+        log('支持的语言: ${locales.map((l) => l.localeId).join(', ')}');
       } else {
-        print('语音识别初始化失败');
+        log('语音识别初始化失败');
       }
     } catch (e) {
-      print('语音识别初始化异常: $e');
+      log('语音识别初始化异常: $e');
       speechEnabled.value = false;
     }
   }
@@ -127,7 +125,9 @@ class ChatController extends GetxController {
 
       // 如果本地语音识别未初始化，尝试初始化（用于录音）
       if (!speechEnabled.value) {
-        await _initSpeech();
+        _initSpeech();
+        // 等待一下让初始化完成
+        await Future.delayed(const Duration(milliseconds: 500));
         if (!speechEnabled.value) {
           MyDialog.info('无法初始化录音功能，请检查设备设置');
           return;
@@ -142,10 +142,12 @@ class ChatController extends GetxController {
         var locales = await _speechToText.locales();
         String localeId = 'zh_CN';
         
-        var chineseLocale = locales.firstWhere(
-          (locale) => locale.localeId.startsWith('zh'),
-          orElse: () => locales.isNotEmpty ? locales.first : null,
-        );
+        var chineseLocale = locales.isNotEmpty 
+            ? locales.firstWhere(
+                (locale) => locale.localeId.startsWith('zh'),
+                orElse: () => locales.first,
+              )
+            : null;
         
         if (chineseLocale != null) {
           localeId = chineseLocale.localeId;

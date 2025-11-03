@@ -86,8 +86,8 @@ class _ChatBotFeatureState extends State<ChatBotFeature> {
                   height: 48,
                   decoration: BoxDecoration(
                     color: _c.isListening.value 
-                        ? Colors.red.withOpacity(0.1)
-                        : Colors.blue.withOpacity(0.1),
+                        ? Colors.red.withValues(alpha: 0.1)
+                        : Colors.blue.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                     border: Border.all(
                       color: _c.isListening.value ? Colors.red : Colors.blue,
@@ -167,12 +167,12 @@ class _ChatBotFeatureState extends State<ChatBotFeature> {
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
-                color: Colors.red.withOpacity(0.1),
-                child: Row(
+                color: Colors.red.withValues(alpha: 0.1),
+                child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.mic, color: Colors.red, size: 16),
-                    const SizedBox(width: 8),
+                    Icon(Icons.mic, color: Colors.red, size: 16),
+                    SizedBox(width: 8),
                     Text(
                       '正在听取语音输入...',
                       style: TextStyle(
@@ -195,14 +195,14 @@ class _ChatBotFeatureState extends State<ChatBotFeature> {
                           Icon(
                             Icons.chat_bubble_outline,
                             size: 64,
-                            color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.3),
+                            color: Theme.of(context).textTheme.bodyMedium?.color?.withValues(alpha: 0.3),
                           ),
                           const SizedBox(height: 16),
                           Text(
                             '开始与AI助手对话吧！',
                             style: TextStyle(
                               fontSize: 16,
-                              color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6),
+                              color: Theme.of(context).textTheme.bodyMedium?.color?.withValues(alpha: 0.6),
                             ),
                           ),
                         ],

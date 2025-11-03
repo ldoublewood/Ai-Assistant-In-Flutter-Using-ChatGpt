@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:get/get_navigation/src/root/get_material_app.dart';
+import 'package:get/get.dart';
 
 import 'apis/app_write.dart';
 import 'helper/ad_helper.dart';
@@ -83,5 +83,5 @@ extension AppTheme on ThemeData {
 
   //button color
   Color get buttonColor =>
-      brightness == Brightness.dark ? Colors.cyan.withOpacity(.5) : Colors.blue;
+      brightness == Brightness.dark ? Colors.cyan.withValues(alpha: 0.5) : Colors.blue;
 }
