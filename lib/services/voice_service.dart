@@ -1,6 +1,6 @@
-import 'dart:developer';
 import 'remote_voice_service.dart';
 import 'voice_config.dart';
+import '../utils/logger.dart';
 
 /// 语音服务统一接口类，支持本地和远程语音识别
 class VoiceService {
@@ -9,8 +9,8 @@ class VoiceService {
   /// 返回识别出的文字内容
   static Future<String> speechToText(String audioPath) async {
     try {
-      log('开始语音识别，音频文件路径: $audioPath');
-      log('使用${VoiceConfig.useRemoteVoice ? "远程" : "本地"}语音识别');
+      Logger.voice('开始语音识别，音频文件路径: $audioPath');
+      Logger.voice('使用${VoiceConfig.useRemoteVoice ? "远程" : "本地"}语音识别');
       
       if (VoiceConfig.useRemoteVoice) {
         // 使用远程语音识别
@@ -21,11 +21,11 @@ class VoiceService {
         );
       } else {
         // 本地语音识别已被屏蔽，提示用户
-        log('本地语音识别已被禁用');
+        Logger.warning('本地语音识别已被禁用');
         return '本地语音识别功能已禁用，请在设置中启用远程语音识别';
       }
     } catch (e) {
-      log('语音识别异常: $e');
+      Logger.error('语音识别异常: $e', error: e);
       return '语音识别出错: ${e.toString()}';
     }
   }
@@ -39,11 +39,11 @@ class VoiceService {
         return await RemoteVoiceService.checkServerConnection();
       } else {
         // 本地语音识别已被屏蔽
-        log('本地语音识别已被禁用');
+        Logger.warning('本地语音识别已被禁用');
         return false;
       }
     } catch (e) {
-      log('服务器连接检查失败: $e');
+      Logger.error('服务器连接检查失败: $e', error: e);
       return false;
     }
   }

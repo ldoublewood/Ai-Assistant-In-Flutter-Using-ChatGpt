@@ -126,7 +126,7 @@ class _ChatBotFeatureState extends State<ChatBotFeature> {
                       hintText: '输入消息或点击语音按钮输入...',
                       hintStyle: TextStyle(
                         fontSize: 14,
-                        color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6),
+                        color: Theme.of(context).textTheme.bodyMedium?.color?.withValues(alpha: 0.6),
                       ),
                       border: InputBorder.none,
                       contentPadding: const EdgeInsets.symmetric(
@@ -174,11 +174,11 @@ class _ChatBotFeatureState extends State<ChatBotFeature> {
                 color: Colors.red.withValues(alpha: 0.1),
                 child: Column(
                   children: [
-                    Row(
+                    const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(Icons.mic, color: Colors.red, size: 16),
-                        const SizedBox(width: 8),
+                        SizedBox(width: 8),
                         Text(
                           '正在听取语音输入...',
                           style: TextStyle(
@@ -195,8 +195,8 @@ class _ChatBotFeatureState extends State<ChatBotFeature> {
                         padding: const EdgeInsets.only(top: 8),
                         child: Text(
                           _c.recognizedText.value,
-                          style: TextStyle(
-                            color: Colors.red[700],
+                          style: const TextStyle(
+                            color: Colors.red,
                             fontSize: 12,
                             fontStyle: FontStyle.italic,
                           ),

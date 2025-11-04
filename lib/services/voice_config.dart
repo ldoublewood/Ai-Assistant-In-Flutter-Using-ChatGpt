@@ -1,5 +1,5 @@
-import 'dart:developer';
 import '../helper/pref.dart';
+import '../utils/logger.dart';
 
 /// 语音识别配置管理类
 class VoiceConfig {
@@ -9,7 +9,7 @@ class VoiceConfig {
   static const String _keyVoiceLanguage = 'voice_language';
   
   // 默认配置
-  static const String _defaultRemoteUrl = 'http://localhost:9880';
+  static const String _defaultRemoteUrl = 'http://localhost:8000';
   static const String _defaultLanguage = 'auto';
   
   /// 是否使用远程语音识别
@@ -20,7 +20,7 @@ class VoiceConfig {
   /// 设置是否使用远程语音识别
   static Future<void> setUseRemoteVoice(bool value) async {
     await Pref.setBool(_keyUseRemoteVoice, value);
-    log('语音识别模式设置为: ${value ? "远程" : "本地"}');
+    Logger.config('语音识别模式设置为: ${value ? "远程" : "本地"}');
   }
   
   /// 获取远程语音识别服务器地址
@@ -32,7 +32,7 @@ class VoiceConfig {
   static Future<void> setRemoteVoiceUrl(String url) async {
     final cleanUrl = url.trim();
     await Pref.setString(_keyRemoteVoiceUrl, cleanUrl);
-    log('远程语音识别服务器地址设置为: $cleanUrl');
+    Logger.config('远程语音识别服务器地址设置为: $cleanUrl');
   }
   
   /// 获取语音识别语言
@@ -43,7 +43,7 @@ class VoiceConfig {
   /// 设置语音识别语言
   static Future<void> setVoiceLanguage(String language) async {
     await Pref.setString(_keyVoiceLanguage, language);
-    log('语音识别语言设置为: $language');
+    Logger.config('语音识别语言设置为: $language');
   }
   
   /// 获取所有配置信息
@@ -60,7 +60,7 @@ class VoiceConfig {
     await setUseRemoteVoice(false);
     await setRemoteVoiceUrl(_defaultRemoteUrl);
     await setVoiceLanguage(_defaultLanguage);
-    log('语音识别配置已重置为默认值');
+    Logger.config('语音识别配置已重置为默认值');
   }
   
   /// 验证远程服务器地址格式

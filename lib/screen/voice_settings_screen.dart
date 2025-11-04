@@ -3,6 +3,8 @@ import 'package:get/get.dart';
 import '../services/voice_config.dart';
 import '../services/remote_voice_service.dart';
 import '../helper/my_dialog.dart';
+import '../controller/chat_controller.dart';
+import 'voice_test_screen.dart';
 
 /// 语音设置界面
 class VoiceSettingsScreen extends StatefulWidget {
@@ -40,6 +42,14 @@ class _VoiceSettingsScreenState extends State<VoiceSettingsScreen> {
       await VoiceConfig.setUseRemoteVoice(_useRemoteVoice);
       await VoiceConfig.setRemoteVoiceUrl(_urlController.text.trim());
       await VoiceConfig.setVoiceLanguage(_selectedLanguage);
+      
+      // 通知聊天控制器重新加载配置
+      try {
+        final chatController = Get.find<ChatController>();
+        chatController.reloadVoiceConfig();
+      } catch (e) {
+        // 如果聊天控制器不存在，忽略错误
+      }
       
       MyDialog.success('设置保存成功');
     } catch (e) {
@@ -107,6 +117,11 @@ class _VoiceSettingsScreenState extends State<VoiceSettingsScreen> {
     }
   }
 
+  /// 打开测试界面
+  void _openTestScreen() {
+    Get.to(() => const VoiceTestScreen());
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -166,7 +181,7 @@ class _VoiceSettingsScreenState extends State<VoiceSettingsScreen> {
                         ),
                         child: Row(
                           children: [
-                            Icon(Icons.warning, color: Colors.orange, size: 20),
+                            const Icon(Icons.warning, color: Colors.orange, size: 20),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
@@ -206,7 +221,7 @@ class _VoiceSettingsScreenState extends State<VoiceSettingsScreen> {
                         controller: _urlController,
                         decoration: const InputDecoration(
                           labelText: '服务器地址',
-                          hintText: 'http://localhost:9880',
+                          hintText: 'http://localhost:8000',
                           prefixIcon: Icon(Icons.link),
                           border: OutlineInputBorder(),
                         ),
@@ -246,7 +261,7 @@ class _VoiceSettingsScreenState extends State<VoiceSettingsScreen> {
                             children: [
                               Row(
                                 children: [
-                                  Icon(Icons.check_circle, color: Colors.green, size: 20),
+                                  const Icon(Icons.check_circle, color: Colors.green, size: 20),
                                   const SizedBox(width: 8),
                                   Text(
                                     '服务器连接正常',
@@ -279,7 +294,7 @@ class _VoiceSettingsScreenState extends State<VoiceSettingsScreen> {
                             children: [
                               Row(
                                 children: [
-                                  Icon(Icons.info, color: Colors.orange, size: 20),
+                                  const Icon(Icons.info, color: Colors.orange, size: 20),
                                   const SizedBox(width: 8),
                                   Text(
                                     '服务器详细信息不可用',
@@ -291,7 +306,7 @@ class _VoiceSettingsScreenState extends State<VoiceSettingsScreen> {
                                 ],
                               ),
                               const SizedBox(height: 8),
-                              Text('health接口暂时被屏蔽，但语音识别功能正常'),
+                              const Text('health接口暂时被屏蔽，但语音识别功能正常'),
                             ],
                           ),
                         ),
@@ -318,7 +333,7 @@ class _VoiceSettingsScreenState extends State<VoiceSettingsScreen> {
                       ),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
-                        value: _selectedLanguage,
+                        initialValue: _selectedLanguage,
                         decoration: const InputDecoration(
                           border: OutlineInputBorder(),
                           prefixIcon: Icon(Icons.language),
@@ -355,7 +370,15 @@ class _VoiceSettingsScreenState extends State<VoiceSettingsScreen> {
                     label: const Text('重置默认'),
                   ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _openTestScreen,
+                    icon: const Icon(Icons.bug_report),
+                    label: const Text('测试功能'),
+                  ),
+                ),
+                const SizedBox(width: 8),
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: _saveSettings,
@@ -384,10 +407,11 @@ class _VoiceSettingsScreenState extends State<VoiceSettingsScreen> {
                     const SizedBox(height: 8),
                     const Text(
                       '• 远程语音识别基于SenseVoice-Api项目\n'
-                      '• 默认服务器地址为 http://localhost:9880\n'
+                      '• 默认服务器地址为 http://localhost:8000\n'
                       '• 请确保SenseVoice服务正在运行\n'
                       '• 支持多种音频格式：wav, mp3, flac, m4a等\n'
-                      '• 建议音频文件大小不超过30MB',
+                      '• 建议音频文件大小不超过30MB\n'
+                      '• 支持多语言识别、情感识别和音频事件检测',
                       style: TextStyle(fontSize: 14),
                     ),
                   ],

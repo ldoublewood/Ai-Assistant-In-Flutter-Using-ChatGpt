@@ -1,0 +1,239 @@
+openapi: 3.0.3
+info:
+  title: SenseVoice API
+  description: |
+    基于 SenseVoice 的语音识别 API 服务
+    
+    SenseVoice 是具有音频理解能力的音频基础模型，包括：
+    - 语音识别（ASR）
+    - 语种识别（LID）  
+    - 语音情感识别（SER）
+    - 声学事件分类（AEC）或声学事件检测（AED）
+    
+    **核心功能：**
+    - **多语言识别：** 支持超过50种语言，识别效果优于Whisper模型
+    - **富文本识别：** 具备优秀的情感识别和声音事件检测能力
+    - **高效推理：** 10s音频推理仅耗时70ms，15倍优于Whisper-Large
+    
+    **项目地址：** https://github.com/HG-ha/SenseVoice-Api
+  version: 1.0.0
+  contact:
+    name: 一铭
+    url: https://api2.wer.plus
+  license:
+    name: MIT
+    
+servers:
+  - url: http://127.0.0.1:8000
+    description: 本地开发服务器
+  - url: http://0.0.0.0:8000
+    description: 生产服务器
+
+paths:
+  /extract_text:
+    post:
+      summary: 语音转文字
+      description: |
+        从音频文件或URL中提取文字内容，支持多语言识别、情感识别和音频事件检测。
+        
+        **支持的输入方式：**
+        - 通过 URL 链接提供音频文件
+        - 直接上传音频文件
+        
+        **支持的音频格式：**
+        - WAV, MP3, FLAC, M4A 等常见音频格式
+        
+        **识别能力：**
+        - 多语言语音识别（50+种语言）
+        - 情感识别（快乐、悲伤、愤怒等）
+        - 音频事件检测（音乐、掌声、笑声、哭声、咳嗽、喷嚏等）
+      operationId: extractText
+      tags:
+        - 语音识别
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                url:
+                  type: string
+                  format: uri
+                  description: 音频文件的URL链接
+                  example: "https://isv-data.oss-cn-hangzhou.aliyuncs.com/ics/MaaS/ASR/test_audio/asr_example_zh.wav"
+                file:
+                  type: string
+                  format: binary
+                  description: 直接上传的音频文件
+              oneOf:
+                - required: [url]
+                - required: [file]
+            examples:
+              url_example:
+                summary: 通过URL提供音频
+                value:
+                  url: "https://isv-data.oss-cn-hangzhou.aliyuncs.com/ics/MaaS/ASR/test_audio/asr_example_zh.wav"
+              file_example:
+                summary: 直接上传音频文件
+                value:
+                  file: "[二进制音频文件数据]"
+      responses:
+        '200':
+          description: 语音识别成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                success_example:
+                  summary: 识别成功示例
+                  value:
+                    message: "input processed successfully"
+                    results: "你好，这是一段测试音频。"
+                    label_result: "<|zh|><|NEUTRAL|><|Speech|><|withitn|>你好，这是一段测试音频。"
+                emotion_example:
+                  summary: 包含情感识别的示例
+                  value:
+                    message: "input processed successfully"
+                    results: "我今天很开心！"
+                    label_result: "<|zh|><|HAPPY|><|Speech|><|withitn|>我今天很开心！"
+                event_example:
+                  summary: 包含音频事件的示例
+                  value:
+                    message: "input processed successfully"
+                    results: "大家好 [掌声]"
+                    label_result: "<|zh|><|NEUTRAL|><|Speech|><|withitn|>大家好<|Applause|>"
+        '400':
+          description: 请求参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                no_audio_source:
+                  summary: 未提供音频源
+                  value:
+                    detail: "No valid audio source provided."
+                invalid_url:
+                  summary: 无效的URL
+                  value:
+                    detail: "Failed to download image: 404"
+                validation_error:
+                  summary: 参数验证错误
+                  value:
+                    detail: [
+                      {
+                        "loc": ["body", "url"],
+                        "msg": "invalid or missing URL scheme",
+                        "type": "value_error.url.scheme"
+                      }
+                    ]
+        '500':
+          description: 服务器内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                processing_error:
+                  summary: 音频处理错误
+                  value:
+                    detail: "Audio processing failed: unsupported format"
+                model_error:
+                  summary: 模型推理错误
+                  value:
+                    detail: "Model inference failed"
+
+  /docs:
+    get:
+      summary: API 文档
+      description: 获取 Swagger UI 格式的 API 文档
+      operationId: getDocs
+      tags:
+        - 文档
+      responses:
+        '200':
+          description: API 文档页面
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /openapi.json:
+    get:
+      summary: OpenAPI 规范
+      description: 获取 JSON 格式的 OpenAPI 规范文件
+      operationId: getOpenApiSpec
+      tags:
+        - 文档
+      responses:
+        '200':
+          description: OpenAPI 规范
+          content:
+            application/json:
+              schema:
+                type: object
+
+components:
+  schemas:
+    ApiResponse:
+      type: object
+      required:
+        - message
+        - results
+        - label_result
+      properties:
+        message:
+          type: string
+          description: 状态消息，表示操作是否成功
+          example: "input processed successfully"
+        results:
+          type: string
+          description: 清理后的识别结果（移除标签）
+          example: "你好，这是一段测试音频。"
+        label_result:
+          type: string
+          description: 完整的识别结果（包含语言、情感、事件标签）
+          example: "<|zh|><|NEUTRAL|><|Speech|><|withitn|>你好，这是一段测试音频。"
+      example:
+        message: "input processed successfully"
+        results: "你好，这是一段测试音频。"
+        label_result: "<|zh|><|NEUTRAL|><|Speech|><|withitn|>你好，这是一段测试音频。"
+
+    ErrorResponse:
+      type: object
+      required:
+        - detail
+      properties:
+        detail:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: object
+          description: 错误详细信息
+          example: "No valid audio source provided."
+
+  examples:
+    ChineseAudio:
+      summary: 中文音频识别
+      description: 识别中文语音的示例
+      value:
+        url: "https://isv-data.oss-cn-hangzhou.aliyuncs.com/ics/MaaS/ASR/test_audio/asr_example_zh.wav"
+    
+    EnglishAudio:
+      summary: 英文音频识别  
+      description: 识别英文语音的示例
+      value:
+        url: "https://isv-data.oss-cn-hangzhou.aliyuncs.com/ics/MaaS/ASR/test_audio/asr_example_en.wav"
+
+tags:
+  - name: 语音识别
+    description: 语音转文字相关接口
+  - name: 文档
+    description: API 文档相关接口
+
+externalDocs:
+  description: SenseVoice 项目文档
+  url: https://github.com/FunAudioLLM/SenseVoice

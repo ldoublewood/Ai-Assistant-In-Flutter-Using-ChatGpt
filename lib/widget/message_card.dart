@@ -22,7 +22,7 @@ class MessageCard extends StatelessWidget {
               const SizedBox(width: 6),
               CircleAvatar(
                 radius: 18,
-                backgroundColor: Colors.blue.withOpacity(0.1),
+                backgroundColor: Colors.blue.withValues(alpha: 0.1),
                 child: const Icon(
                   Icons.smart_toy,
                   color: Colors.blue,
@@ -84,10 +84,10 @@ class MessageCard extends StatelessWidget {
                             ),
                             blockquoteDecoration: BoxDecoration(
                               color: Theme.of(context).brightness == Brightness.dark
-                                  ? Colors.blue.withOpacity(0.1)
-                                  : Colors.blue.withOpacity(0.05),
+                                  ? Colors.blue.withValues(alpha: 0.1)
+                                  : Colors.blue.withValues(alpha: 0.05),
                               borderRadius: BorderRadius.circular(4),
-                              border: Border(
+                              border: const Border(
                                 left: BorderSide(
                                   color: Colors.blue,
                                   width: 4,
@@ -116,9 +116,9 @@ class MessageCard extends StatelessWidget {
                     vertical: mq.height * .015,
                     horizontal: mq.width * .03,
                   ),
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     color: Colors.blue,
-                    borderRadius: const BorderRadius.only(
+                    borderRadius: BorderRadius.only(
                       topLeft: r,
                       topRight: r,
                       bottomLeft: r,
