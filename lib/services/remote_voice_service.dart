@@ -36,6 +36,13 @@ class RemoteVoiceService {
       
       // 检查文件大小（SenseVoice建议不超过30MB）
       final fileSize = await audioFile.length();
+      Logger.voice('音频文件大小: ${fileSize}字节 (${(fileSize / 1024).toStringAsFixed(2)}KB)');
+      
+      if (fileSize == 0) {
+        Logger.error('音频文件为空: $audioPath');
+        return '音频文件为空，请重新录制';
+      }
+      
       if (fileSize > 30 * 1024 * 1024) {
         Logger.warning('音频文件过大: ${fileSize / 1024 / 1024}MB');
         return '音频文件过大，请使用小于30MB的文件';
@@ -45,6 +52,13 @@ class RemoteVoiceService {
         'POST',
         Uri.parse('$_baseUrl/extract_text'),
       );
+      
+      // 读取文件前几个字节检查文件内容
+      final bytes = await audioFile.readAsBytes();
+      if (bytes.length >= 4) {
+        String hexHeader = bytes.take(4).map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ');
+        Logger.voice('音频文件头部字节: $hexHeader');
+      }
       
       // 添加音频文件 - 新API使用 'file' 字段名
       request.files.add(

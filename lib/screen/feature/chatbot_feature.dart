@@ -13,7 +13,7 @@ class ChatBotFeature extends StatefulWidget {
 }
 
 class _ChatBotFeatureState extends State<ChatBotFeature> {
-  final _c = ChatController();
+  final _c = Get.find<ChatController>();
   final _isDarkMode = Get.isDarkMode.obs;
 
   @override

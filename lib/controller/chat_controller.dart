@@ -61,6 +61,70 @@ class ChatController extends GetxController {
     // 检查权限
     var micPermission = await Permission.microphone.status;
     Logger.debug('麦克风权限状态: $micPermission');
+    
+    // 测试录音功能
+    await _testRecordingCapability();
+  }
+
+  /// 测试录音能力
+  Future<void> _testRecordingCapability() async {
+    Logger.debug('=== 开始录音能力测试 ===');
+    
+    try {
+      // 重新初始化录音器
+      if (_audioRecorder != null) {
+        await _audioRecorder!.closeRecorder();
+      }
+      await _initAudioRecorder();
+      
+      if (_audioRecorder == null) {
+        Logger.error('录音器初始化失败');
+        return;
+      }
+      
+      // 创建测试录音文件
+      final tempDir = await getTemporaryDirectory();
+      final testPath = '${tempDir.path}/test_recording.wav';
+      
+      Logger.debug('开始测试录音，文件路径: $testPath');
+      
+      // 开始录音
+      await _audioRecorder!.startRecorder(
+        toFile: testPath,
+        codec: Codec.pcm16WAV,
+      );
+      
+      Logger.debug('录音器状态: ${_audioRecorder!.isRecording ? "正在录音" : "未录音"}');
+      
+      // 录音2秒
+      await Future.delayed(const Duration(seconds: 2));
+      
+      // 停止录音
+      await _audioRecorder!.stopRecorder();
+      
+      // 检查文件
+      final testFile = File(testPath);
+      if (await testFile.exists()) {
+        final fileSize = await testFile.length();
+        Logger.debug('测试录音文件大小: ${fileSize}字节');
+        
+        if (fileSize > 44) {
+          Logger.debug('录音测试成功 - 文件包含音频数据');
+        } else {
+          Logger.error('录音测试失败 - 文件只包含头部，无音频数据');
+        }
+        
+        // 清理测试文件
+        await testFile.delete();
+      } else {
+        Logger.error('录音测试失败 - 文件未创建');
+      }
+      
+    } catch (e) {
+      Logger.error('录音能力测试异常: $e', error: e);
+    }
+    
+    Logger.debug('=== 录音能力测试完成 ===');
   }
 
   /// 加载语音配置
@@ -78,11 +142,38 @@ class ChatController extends GetxController {
   Future<void> _initAudioRecorder() async {
     try {
       _audioRecorder = FlutterSoundRecorder();
+      
+      // 检查并请求录音权限
+      var status = await Permission.microphone.status;
+      Logger.debug('当前麦克风权限状态: $status');
+      
+      if (status != PermissionStatus.granted) {
+        Logger.debug('请求麦克风权限...');
+        status = await Permission.microphone.request();
+        Logger.debug('权限请求结果: $status');
+        
+        if (status != PermissionStatus.granted) {
+          Logger.error('麦克风权限被拒绝');
+          throw Exception('麦克风权限被拒绝');
+        }
+      }
+      
+      Logger.debug('开始打开录音器...');
       await _audioRecorder!.openRecorder();
+      
+      // 检查录音器是否成功打开
+      if (_audioRecorder!.isStopped) {
+        Logger.debug('录音器已成功打开');
+      } else {
+        Logger.warning('录音器状态异常');
+      }
+      
       Logger.debug('音频录制器初始化成功');
+      Logger.debug('录音器状态: ${_audioRecorder!.isRecording ? "正在录音" : "空闲"}');
     } catch (e) {
       Logger.error('音频录制器初始化失败: $e', error: e);
       _audioRecorder = null;
+      rethrow; // 重新抛出异常，让调用者知道初始化失败
     }
   }
 
@@ -279,6 +370,54 @@ class ChatController extends GetxController {
     }
   }
 
+  // 录音开始时间
+  DateTime? _recordingStartTime;
+
+  /// 验证WAV文件格式
+  Future<bool> _validateWavFile(File audioFile) async {
+    try {
+      final bytes = await audioFile.readAsBytes();
+      if (bytes.length < 44) {
+        Logger.error('WAV文件太小，可能不是有效的WAV文件');
+        return false;
+      }
+      
+      // 检查是否只有文件头没有音频数据
+      if (bytes.length == 44) {
+        Logger.error('WAV文件只包含文件头，没有音频数据 - 录音可能失败');
+        return false;
+      }
+      
+      // 检查WAV文件头
+      // RIFF标识符 (0-3字节)
+      String riffHeader = String.fromCharCodes(bytes.sublist(0, 4));
+      if (riffHeader != 'RIFF') {
+        Logger.error('WAV文件缺少RIFF头: $riffHeader');
+        return false;
+      }
+      
+      // WAVE标识符 (8-11字节)
+      String waveHeader = String.fromCharCodes(bytes.sublist(8, 12));
+      if (waveHeader != 'WAVE') {
+        Logger.error('WAV文件缺少WAVE头: $waveHeader');
+        return false;
+      }
+      
+      // fmt标识符 (12-15字节)
+      String fmtHeader = String.fromCharCodes(bytes.sublist(12, 16));
+      if (fmtHeader != 'fmt ') {
+        Logger.error('WAV文件缺少fmt头: $fmtHeader');
+        return false;
+      }
+      
+      Logger.voice('WAV文件格式验证通过，包含 ${bytes.length - 44} 字节音频数据');
+      return true;
+    } catch (e) {
+      Logger.error('WAV文件验证异常: $e', error: e);
+      return false;
+    }
+  }
+
   /// 开始音频录制
   Future<void> _startAudioRecording() async {
     try {
@@ -293,16 +432,41 @@ class ChatController extends GetxController {
       
       Logger.voice('准备开始录音，文件路径: $_currentAudioPath');
       
-      // 开始录音
-      await _audioRecorder!.startRecorder(
-        toFile: _currentAudioPath,
-        codec: Codec.pcm16WAV, // 使用WAV格式，兼容性更好
-      );
+      // 记录录音开始时间
+      _recordingStartTime = DateTime.now();
       
+      // 尝试不同的录音配置
+      Logger.voice('尝试使用WAV格式录音...');
+      try {
+        await _audioRecorder!.startRecorder(
+          toFile: _currentAudioPath,
+          codec: Codec.pcm16WAV,
+        );
+      } catch (e) {
+        Logger.warning('WAV格式录音失败，尝试AAC格式: $e');
+        // 如果WAV失败，尝试AAC格式
+        _currentAudioPath = _currentAudioPath!.replaceAll('.wav', '.aac');
+        await _audioRecorder!.startRecorder(
+          toFile: _currentAudioPath,
+          codec: Codec.aacADTS,
+        );
+      }
+      
+      // 等待一小段时间确保录音真正开始
+      await Future.delayed(const Duration(milliseconds: 100));
+      
+      // 检查录音状态
+      bool isRecording = _audioRecorder!.isRecording;
       Logger.voice('录音已开始，文件路径: $_currentAudioPath');
+      Logger.voice('录音器状态检查: ${isRecording ? "正在录音" : "录音未启动"}');
+      
+      if (!isRecording) {
+        throw Exception('录音器启动失败，状态检查显示未在录音');
+      }
     } catch (e) {
       Logger.error('开始录音失败: $e', error: e);
       _currentAudioPath = null;
+      _recordingStartTime = null;
       rethrow;
     }
   }
@@ -314,9 +478,44 @@ class ChatController extends GetxController {
       
       // 停止录音
       await _audioRecorder!.stopRecorder();
+      
+      // 计算录音时长
+      Duration? recordingDuration;
+      if (_recordingStartTime != null) {
+        recordingDuration = DateTime.now().difference(_recordingStartTime!);
+        Logger.voice('录音时长: ${recordingDuration.inMilliseconds}毫秒');
+      }
+      
       Logger.voice('录音已停止，文件路径: $_currentAudioPath');
       
       if (_currentAudioPath != null && File(_currentAudioPath!).existsSync()) {
+        // 检查录音文件大小
+        final audioFile = File(_currentAudioPath!);
+        final fileSize = await audioFile.length();
+        Logger.voice('录音文件大小: ${fileSize}字节 (${(fileSize / 1024).toStringAsFixed(2)}KB)');
+        
+        if (fileSize == 0) {
+          recognizedText.value = '录音文件为空，请重试';
+          Logger.error('录音文件为空: $_currentAudioPath');
+          MyDialog.info('录音失败：文件为空，请重试');
+          return;
+        }
+        
+        // 检查录音时长是否太短
+        if (recordingDuration != null && recordingDuration.inMilliseconds < 500) {
+          recognizedText.value = '录音时间太短，请重试';
+          Logger.warning('录音时间太短: ${recordingDuration.inMilliseconds}毫秒');
+          MyDialog.info('录音时间太短，请说话时间长一些');
+          return;
+        }
+        
+        // 验证WAV文件格式
+        if (!await _validateWavFile(audioFile)) {
+          recognizedText.value = '音频文件格式无效，请重试';
+          Logger.error('音频文件格式验证失败: $_currentAudioPath');
+          MyDialog.info('音频文件格式无效，请重试');
+          return;
+        }
         recognizedText.value = '正在使用远程服务器识别语音...';
         
         // 发送音频文件到远程服务器进行识别
@@ -352,6 +551,7 @@ class ChatController extends GetxController {
       MyDialog.info('语音识别处理失败: $e');
     } finally {
       _currentAudioPath = null;
+      _recordingStartTime = null;
     }
   }
 

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import 'apis/app_write.dart';
+import 'controller/chat_controller.dart';
 import 'helper/global.dart';
 import 'helper/pref.dart';
 import 'screen/splash_screen.dart';
@@ -16,6 +17,9 @@ Future<void> main() async {
 
   // for app write initialization
   AppWrite.init();
+
+  // 注册 ChatController 到 GetX 依赖注入系统
+  Get.put(ChatController());
 
   await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   await SystemChrome.setPreferredOrientations(
