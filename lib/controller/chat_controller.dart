@@ -82,36 +82,20 @@ class ChatController extends GetxController {
         return;
       }
       
-      // 创建测试录音文件
-      final tempDir = await getTemporaryDirectory();
-      final testPath = '${tempDir.path}/test_recording.wav';
+      // 创建测试录音文件（使用演示代码的成功方式）
+      final directory = await getApplicationDocumentsDirectory();
+      final testPath = '${directory.path}/test_recording.aac';
       
       Logger.debug('开始测试录音，文件路径: $testPath');
-      Logger.debug('录音器初始状态: ${_audioRecorder!.recorderState}');
       
-      // 开始录音，使用优化配置
+      // 开始录音（使用演示代码的简单配置）
       await _audioRecorder!.startRecorder(
         toFile: testPath,
-        codec: Codec.pcm16WAV,
-        sampleRate: 16000,
-        numChannels: 1,
-        bitRate: 16000,
+        codec: Codec.aacADTS,
       );
       
-      // 等待录音器完全启动
-      await Future.delayed(const Duration(milliseconds: 500));
-      
-      Logger.debug('录音器启动后状态: ${_audioRecorder!.recorderState}');
-      Logger.debug('录音器是否正在录音: ${_audioRecorder!.isRecording}');
-      
-      if (!_audioRecorder!.isRecording) {
-        Logger.error('录音器启动失败，未进入录音状态');
-        return;
-      }
-      
-      // 录音3秒，给足够时间捕获音频
       Logger.debug('录音中，请说话...');
-      await Future.delayed(const Duration(seconds: 3));
+      await Future.delayed(const Duration(seconds: 2));
       
       // 停止录音
       Logger.debug('停止录音...');
@@ -126,20 +110,10 @@ class ChatController extends GetxController {
         final fileSize = await testFile.length();
         Logger.debug('测试录音文件大小: ${fileSize}字节 (${(fileSize / 1024).toStringAsFixed(2)}KB)');
         
-        if (fileSize > 44) {
-          final audioDataSize = fileSize - 44;
-          Logger.debug('录音测试成功 - 文件包含 ${audioDataSize} 字节音频数据');
-          
-          // 验证WAV文件格式
-          final bytes = await testFile.readAsBytes();
-          if (bytes.length >= 44) {
-            String riffHeader = String.fromCharCodes(bytes.sublist(0, 4));
-            String waveHeader = String.fromCharCodes(bytes.sublist(8, 12));
-            Logger.debug('WAV文件头验证: RIFF=$riffHeader, WAVE=$waveHeader');
-          }
+        if (fileSize > 100) { // AAC文件的最小有效大小
+          Logger.debug('录音测试成功 - 文件包含有效音频数据');
         } else {
-          Logger.error('录音测试失败 - 文件只包含头部(${fileSize}字节)，无音频数据');
-          Logger.error('可能原因: 1.麦克风权限问题 2.设备兼容性问题 3.录音器配置问题');
+          Logger.error('录音测试失败 - 文件太小(${fileSize}字节)，可能无音频数据');
         }
         
         // 清理测试文件
@@ -180,42 +154,20 @@ class ChatController extends GetxController {
       
       _audioRecorder = FlutterSoundRecorder();
       
-      // 检查并请求录音权限
-      var status = await Permission.microphone.status;
-      Logger.debug('当前麦克风权限状态: $status');
-      
+      // 请求录音权限（采用演示代码的简单方式）
+      final status = await Permission.microphone.request();
       if (status != PermissionStatus.granted) {
-        Logger.debug('请求麦克风权限...');
-        status = await Permission.microphone.request();
-        Logger.debug('权限请求结果: $status');
-        
-        if (status != PermissionStatus.granted) {
-          Logger.error('麦克风权限被拒绝');
-          throw Exception('麦克风权限被拒绝');
-        }
+        throw Exception('录音权限被拒绝');
       }
       
-      Logger.debug('开始打开录音器...');
-      
-      // 使用更详细的配置打开录音器
+      // 初始化录音器（采用演示代码的简单方式）
       await _audioRecorder!.openRecorder();
       
-      // 等待录音器完全初始化
-      await Future.delayed(const Duration(milliseconds: 200));
-      
-      // 检查录音器是否成功打开
-      if (_audioRecorder!.isStopped) {
-        Logger.debug('录音器已成功打开');
-      } else {
-        Logger.warning('录音器状态异常: ${_audioRecorder!.recorderState}');
-      }
-      
       Logger.debug('音频录制器初始化成功');
-      Logger.debug('录音器状态: ${_audioRecorder!.isRecording ? "正在录音" : "空闲"}');
     } catch (e) {
       Logger.error('音频录制器初始化失败: $e', error: e);
       _audioRecorder = null;
-      rethrow; // 重新抛出异常，让调用者知道初始化失败
+      rethrow;
     }
   }
 
@@ -467,65 +419,21 @@ class ChatController extends GetxController {
         throw Exception('音频录制器未初始化');
       }
       
-      // 确保录音器处于正确状态
-      if (!_audioRecorder!.isStopped) {
-        Logger.warning('录音器不在停止状态，尝试重新初始化');
-        await _initAudioRecorder();
-      }
-      
-      // 获取临时目录
-      final tempDir = await getTemporaryDirectory();
+      // 获取应用文档目录（使用演示代码中成功的方式）
+      final directory = await getApplicationDocumentsDirectory();
       final timestamp = DateTime.now().millisecondsSinceEpoch;
-      _currentAudioPath = '${tempDir.path}/voice_$timestamp.wav';
+      _currentAudioPath = '${directory.path}/recording_$timestamp.aac';
       
       Logger.voice('准备开始录音，文件路径: $_currentAudioPath');
       
       // 记录录音开始时间
       _recordingStartTime = DateTime.now();
       
-      // 使用更稳定的录音配置
-      Logger.voice('开始录音，使用优化配置...');
-      
-      try {
-        // 使用 WAV 格式，添加详细配置
-        await _audioRecorder!.startRecorder(
-          toFile: _currentAudioPath,
-          codec: Codec.pcm16WAV,
-          sampleRate: 16000,  // 16kHz 采样率，适合语音识别
-          numChannels: 1,     // 单声道
-          bitRate: 16000,     // 比特率
-        );
-        Logger.voice('WAV格式录音启动成功');
-      } catch (e) {
-        Logger.warning('WAV格式录音失败，尝试AAC格式: $e');
-        // 如果WAV失败，尝试AAC格式
-        _currentAudioPath = _currentAudioPath!.replaceAll('.wav', '.aac');
-        try {
-          await _audioRecorder!.startRecorder(
-            toFile: _currentAudioPath,
-            codec: Codec.aacADTS,
-            sampleRate: 16000,
-            numChannels: 1,
-            bitRate: 32000,
-          );
-          Logger.voice('AAC格式录音启动成功');
-        } catch (e2) {
-          Logger.error('所有录音格式都失败: $e2');
-          throw Exception('无法启动录音: $e2');
-        }
-      }
-      
-      // 等待录音器完全启动
-      await Future.delayed(const Duration(milliseconds: 300));
-      
-      // 检查录音状态
-      bool isRecording = _audioRecorder!.isRecording;
-      Logger.voice('录音状态检查: ${isRecording ? "正在录音" : "录音未启动"}');
-      Logger.voice('录音器状态: ${_audioRecorder!.recorderState}');
-      
-      if (!isRecording) {
-        throw Exception('录音器启动失败，状态检查显示未在录音');
-      }
+      // 使用演示代码中成功的简单配置
+      await _audioRecorder!.startRecorder(
+        toFile: _currentAudioPath,
+        codec: Codec.aacADTS,
+      );
       
       Logger.voice('录音已成功启动，文件路径: $_currentAudioPath');
     } catch (e) {
@@ -574,11 +482,11 @@ class ChatController extends GetxController {
           return;
         }
         
-        // 验证WAV文件格式
-        if (!await _validateWavFile(audioFile)) {
-          recognizedText.value = '音频文件格式无效，请重试';
-          Logger.error('音频文件格式验证失败: $_currentAudioPath');
-          MyDialog.info('音频文件格式无效，请重试');
+        // 简化文件大小检查（AAC格式）
+        if (fileSize < 100) {
+          recognizedText.value = '录音文件太小，请重试';
+          Logger.error('录音文件太小: ${fileSize}字节');
+          MyDialog.info('录音文件太小，请重试');
           return;
         }
         recognizedText.value = '正在使用远程服务器识别语音...';
