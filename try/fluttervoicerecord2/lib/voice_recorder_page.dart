@@ -72,11 +72,14 @@ class _VoiceRecorderPageState extends State<VoiceRecorderPage> {
     try {
       // 获取应用文档目录
       final directory = await getApplicationDocumentsDirectory();
+      //华为手机不支持wav
       final filePath = '${directory.path}/recording_${DateTime.now().millisecondsSinceEpoch}.aac';
+      //final filePath = '${directory.path}/recording_${DateTime.now().millisecondsSinceEpoch}.wav';
 
       await _recorder!.startRecorder(
         toFile: filePath,
         codec: Codec.aacADTS,
+        //codec: Codec.pcm16WAV,
       );
 
       setState(() {
