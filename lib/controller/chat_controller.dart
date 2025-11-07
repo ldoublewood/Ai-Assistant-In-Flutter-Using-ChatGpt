@@ -393,7 +393,7 @@ class ChatController extends GetxController {
         await _speechToText.stop();
         
         // 如果正在使用远程识别且正在录音，停止录音并处理
-        if (useRemoteVoice.value && _audioRecorderService.isRecording) {
+        if (useRemoteVoice.value && await _audioRecorderService.isRecording) {
           await _stopAudioRecordingAndProcess();
         } else {
           isListening.value = false;
