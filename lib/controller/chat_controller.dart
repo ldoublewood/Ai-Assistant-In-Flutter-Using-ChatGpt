@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:flutter_sound/flutter_sound.dart';
-import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 
 import '../apis/apis.dart';
@@ -11,6 +9,8 @@ import '../helper/my_dialog.dart';
 import '../model/message.dart';
 import '../services/voice_service.dart';
 import '../services/voice_config.dart';
+import '../services/audio_recorder_service.dart';
+import '../services/audio_format_config.dart';
 import '../utils/logger.dart';
 
 class ChatController extends GetxController {
@@ -23,8 +23,7 @@ class ChatController extends GetxController {
   final RxBool speechEnabled = false.obs;
   
   // 音频录制相关
-  FlutterSoundRecorder? _audioRecorder;
-  String? _currentAudioPath;
+  final AudioRecorderService _audioRecorderService = AudioRecorderService();
   final RxString recognizedText = ''.obs;
   final RxBool useRemoteVoice = false.obs;
 
@@ -56,7 +55,7 @@ class ChatController extends GetxController {
     Logger.network('服务器连接状态: $isConnected');
     
     // 检查录音器状态
-    Logger.debug('录音器状态: ${_audioRecorder != null ? "已初始化" : "未初始化"}');
+    Logger.debug('录音器状态: 已初始化');
     
     // 检查权限
     var micPermission = await Permission.microphone.status;
@@ -72,54 +71,39 @@ class ChatController extends GetxController {
     
     try {
       // 重新初始化录音器
-      if (_audioRecorder != null) {
-        await _audioRecorder!.closeRecorder();
-      }
       await _initAudioRecorder();
       
-      if (_audioRecorder == null) {
-        Logger.error('录音器初始化失败');
-        return;
-      }
+      Logger.debug('开始测试录音，当前格式: ${AudioFormatConfig.audioFormat}');
       
-      // 创建测试录音文件（使用演示代码的成功方式）
-      final directory = await getApplicationDocumentsDirectory();
-      final testPath = '${directory.path}/test_recording.aac';
-      
-      Logger.debug('开始测试录音，文件路径: $testPath');
-      
-      // 开始录音（使用演示代码的简单配置）
-      await _audioRecorder!.startRecorder(
-        toFile: testPath,
-        codec: Codec.aacADTS,
-      );
+      // 开始录音
+      await _audioRecorderService.startRecording();
       
       Logger.debug('录音中，请说话...');
       await Future.delayed(const Duration(seconds: 2));
       
       // 停止录音
       Logger.debug('停止录音...');
-      await _audioRecorder!.stopRecorder();
+      String? finalPath = await _audioRecorderService.stopRecording();
       
-      // 等待文件写入完成
-      await Future.delayed(const Duration(milliseconds: 200));
-      
-      // 检查文件
-      final testFile = File(testPath);
-      if (await testFile.exists()) {
-        final fileSize = await testFile.length();
-        Logger.debug('测试录音文件大小: ${fileSize}字节 (${(fileSize / 1024).toStringAsFixed(2)}KB)');
+      if (finalPath != null) {
+        // 验证录音文件
+        bool isValid = await _audioRecorderService.validateRecordedFile(finalPath);
         
-        if (fileSize > 100) { // AAC文件的最小有效大小
-          Logger.debug('录音测试成功 - 文件包含有效音频数据');
+        if (isValid) {
+          Logger.debug('录音测试成功 - 文件格式验证通过');
         } else {
-          Logger.error('录音测试失败 - 文件太小(${fileSize}字节)，可能无音频数据');
+          Logger.error('录音测试失败 - 文件格式验证失败');
         }
         
         // 清理测试文件
-        await testFile.delete();
+        try {
+          await File(finalPath).delete();
+          Logger.debug('测试文件已删除');
+        } catch (e) {
+          Logger.warning('删除测试文件失败: $e');
+        }
       } else {
-        Logger.error('录音测试失败 - 文件未创建');
+        Logger.error('录音测试失败 - 未生成有效文件');
       }
       
     } catch (e) {
@@ -143,30 +127,10 @@ class ChatController extends GetxController {
   /// 初始化音频录制器
   Future<void> _initAudioRecorder() async {
     try {
-      // 如果已有录音器，先关闭
-      if (_audioRecorder != null) {
-        try {
-          await _audioRecorder!.closeRecorder();
-        } catch (e) {
-          Logger.warning('关闭旧录音器时出错: $e');
-        }
-      }
-      
-      _audioRecorder = FlutterSoundRecorder();
-      
-      // 请求录音权限（采用演示代码的简单方式）
-      final status = await Permission.microphone.request();
-      if (status != PermissionStatus.granted) {
-        throw Exception('录音权限被拒绝');
-      }
-      
-      // 初始化录音器（采用演示代码的简单方式）
-      await _audioRecorder!.openRecorder();
-      
-      Logger.debug('音频录制器初始化成功');
+      await _audioRecorderService.initialize();
+      Logger.debug('音频录制服务初始化成功');
     } catch (e) {
-      Logger.error('音频录制器初始化失败: $e', error: e);
-      _audioRecorder = null;
+      Logger.error('音频录制服务初始化失败: $e', error: e);
       rethrow;
     }
   }
@@ -291,20 +255,19 @@ class ChatController extends GetxController {
       recognizedText.value = '正在初始化录音功能...';
 
       // 检查录音器是否已初始化
-      if (_audioRecorder == null) {
+      try {
         await _initAudioRecorder();
-        if (_audioRecorder == null) {
-          isListening.value = false;
-          recognizedText.value = '';
-          MyDialog.info('无法初始化录音功能，请检查设备设置');
-          return;
-        }
+      } catch (e) {
+        isListening.value = false;
+        recognizedText.value = '';
+        MyDialog.info('无法初始化录音功能，请检查设备设置');
+        return;
       }
 
       // 开始录音
       try {
-        await _startAudioRecording();
-        Logger.voice('音频录制已启动，等待语音输入');
+        await _audioRecorderService.startRecording();
+        Logger.voice('音频录制已启动，等待语音输入，格式: ${AudioFormatConfig.audioFormat}');
       } catch (e) {
         isListening.value = false;
         recognizedText.value = '';
@@ -364,85 +327,7 @@ class ChatController extends GetxController {
     }
   }
 
-  // 录音开始时间
-  DateTime? _recordingStartTime;
 
-  /// 验证WAV文件格式
-  Future<bool> _validateWavFile(File audioFile) async {
-    try {
-      final bytes = await audioFile.readAsBytes();
-      if (bytes.length < 44) {
-        Logger.error('WAV文件太小，可能不是有效的WAV文件');
-        return false;
-      }
-      
-      // 检查是否只有文件头没有音频数据
-      if (bytes.length == 44) {
-        Logger.error('WAV文件只包含文件头，没有音频数据 - 录音可能失败');
-        return false;
-      }
-      
-      // 检查WAV文件头
-      // RIFF标识符 (0-3字节)
-      String riffHeader = String.fromCharCodes(bytes.sublist(0, 4));
-      if (riffHeader != 'RIFF') {
-        Logger.error('WAV文件缺少RIFF头: $riffHeader');
-        return false;
-      }
-      
-      // WAVE标识符 (8-11字节)
-      String waveHeader = String.fromCharCodes(bytes.sublist(8, 12));
-      if (waveHeader != 'WAVE') {
-        Logger.error('WAV文件缺少WAVE头: $waveHeader');
-        return false;
-      }
-      
-      // fmt标识符 (12-15字节)
-      String fmtHeader = String.fromCharCodes(bytes.sublist(12, 16));
-      if (fmtHeader != 'fmt ') {
-        Logger.error('WAV文件缺少fmt头: $fmtHeader');
-        return false;
-      }
-      
-      Logger.voice('WAV文件格式验证通过，包含 ${bytes.length - 44} 字节音频数据');
-      return true;
-    } catch (e) {
-      Logger.error('WAV文件验证异常: $e', error: e);
-      return false;
-    }
-  }
-
-  /// 开始音频录制
-  Future<void> _startAudioRecording() async {
-    try {
-      if (_audioRecorder == null) {
-        throw Exception('音频录制器未初始化');
-      }
-      
-      // 获取应用文档目录（使用演示代码中成功的方式）
-      final directory = await getApplicationDocumentsDirectory();
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      _currentAudioPath = '${directory.path}/recording_$timestamp.aac';
-      
-      Logger.voice('准备开始录音，文件路径: $_currentAudioPath');
-      
-      // 记录录音开始时间
-      _recordingStartTime = DateTime.now();
-      
-      // 使用演示代码中成功的简单配置
-      await _audioRecorder!.startRecorder(
-        toFile: _currentAudioPath,
-        codec: Codec.aacADTS,
-      );
-      
-      Logger.voice('录音已成功启动，文件路径: $_currentAudioPath');
-    } catch (e) {
-      Logger.error('开始录音失败: $e', error: e);
-      _currentAudioPath = null;
-      _recordingStartTime = null;
-      rethrow;
-    }
-  }
 
   /// 停止音频录制并处理远程识别
   Future<void> _stopAudioRecordingAndProcess() async {
@@ -450,49 +335,23 @@ class ChatController extends GetxController {
       isListening.value = false;
       
       // 停止录音
-      await _audioRecorder!.stopRecorder();
+      String? finalAudioPath = await _audioRecorderService.stopRecording();
       
-      // 计算录音时长
-      Duration? recordingDuration;
-      if (_recordingStartTime != null) {
-        recordingDuration = DateTime.now().difference(_recordingStartTime!);
-        Logger.voice('录音时长: ${recordingDuration.inMilliseconds}毫秒');
-      }
-      
-      Logger.voice('录音已停止，文件路径: $_currentAudioPath');
-      
-      if (_currentAudioPath != null && File(_currentAudioPath!).existsSync()) {
-        // 检查录音文件大小
-        final audioFile = File(_currentAudioPath!);
-        final fileSize = await audioFile.length();
-        Logger.voice('录音文件大小: ${fileSize}字节 (${(fileSize / 1024).toStringAsFixed(2)}KB)');
+      if (finalAudioPath != null) {
+        Logger.voice('录音已停止，最终文件路径: $finalAudioPath');
         
-        if (fileSize == 0) {
-          recognizedText.value = '录音文件为空，请重试';
-          Logger.error('录音文件为空: $_currentAudioPath');
-          MyDialog.info('录音失败：文件为空，请重试');
+        // 验证录音文件
+        bool isValid = await _audioRecorderService.validateRecordedFile(finalAudioPath);
+        if (!isValid) {
+          recognizedText.value = '录音文件无效，请重试';
+          MyDialog.info('录音文件无效，请重试');
           return;
         }
         
-        // 检查录音时长是否太短
-        if (recordingDuration != null && recordingDuration.inMilliseconds < 500) {
-          recognizedText.value = '录音时间太短，请重试';
-          Logger.warning('录音时间太短: ${recordingDuration.inMilliseconds}毫秒');
-          MyDialog.info('录音时间太短，请说话时间长一些');
-          return;
-        }
-        
-        // 简化文件大小检查（AAC格式）
-        if (fileSize < 100) {
-          recognizedText.value = '录音文件太小，请重试';
-          Logger.error('录音文件太小: ${fileSize}字节');
-          MyDialog.info('录音文件太小，请重试');
-          return;
-        }
         recognizedText.value = '正在使用远程服务器识别语音...';
         
         // 发送音频文件到远程服务器进行识别
-        String remoteResult = await VoiceService.speechToText(_currentAudioPath!);
+        String remoteResult = await VoiceService.speechToText(finalAudioPath);
         
         if (remoteResult.isNotEmpty && 
             !remoteResult.contains('失败') && 
@@ -509,22 +368,19 @@ class ChatController extends GetxController {
         
         // 清理临时音频文件
         try {
-          await File(_currentAudioPath!).delete();
+          await File(finalAudioPath).delete();
           Logger.debug('临时音频文件已删除');
         } catch (e) {
           Logger.warning('删除临时音频文件失败: $e', error: e);
         }
       } else {
-        recognizedText.value = '录音文件不存在';
+        recognizedText.value = '录音失败，请重试';
         MyDialog.info('录音失败，请重试');
       }
     } catch (e) {
       Logger.error('停止录音和处理识别异常: $e', error: e);
       recognizedText.value = '';
       MyDialog.info('语音识别处理失败: $e');
-    } finally {
-      _currentAudioPath = null;
-      _recordingStartTime = null;
     }
   }
 
@@ -537,7 +393,7 @@ class ChatController extends GetxController {
         await _speechToText.stop();
         
         // 如果正在使用远程识别且正在录音，停止录音并处理
-        if (useRemoteVoice.value && _audioRecorder != null && _audioRecorder!.isRecording) {
+        if (useRemoteVoice.value && _audioRecorderService.isRecording) {
           await _stopAudioRecordingAndProcess();
         } else {
           isListening.value = false;
@@ -649,7 +505,7 @@ class ChatController extends GetxController {
     textC.dispose();
     scrollC.dispose();
     _speechToText.cancel();
-    _audioRecorder?.closeRecorder();
+    _audioRecorderService.dispose();
     super.onClose();
   }
 }

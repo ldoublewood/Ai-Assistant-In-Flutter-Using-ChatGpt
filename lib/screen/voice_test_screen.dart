@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controller/chat_controller.dart';
 import '../services/voice_config.dart';
+import '../services/audio_format_config.dart';
 import '../utils/log_test.dart';
 import '../utils/logger.dart';
 
@@ -47,6 +48,7 @@ class _VoiceTestScreenState extends State<VoiceTestScreen> {
                     Text('使用远程语音识别: ${VoiceConfig.useRemoteVoice ? "是" : "否"}'),
                     Text('服务器地址: ${VoiceConfig.remoteVoiceUrl}'),
                     Text('识别语言: ${VoiceConfig.voiceLanguage}'),
+                    Text('录音格式: ${AudioFormatConfig.getFormatName(AudioFormatConfig.audioFormat)}'),
                   ],
                 ),
               ),

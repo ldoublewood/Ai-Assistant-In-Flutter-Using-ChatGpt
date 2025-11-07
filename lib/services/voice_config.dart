@@ -1,5 +1,6 @@
 import '../helper/pref.dart';
 import '../utils/logger.dart';
+import 'audio_format_config.dart';
 
 /// 语音识别配置管理类
 class VoiceConfig {
@@ -52,6 +53,8 @@ class VoiceConfig {
       'useRemoteVoice': useRemoteVoice,
       'remoteVoiceUrl': remoteVoiceUrl,
       'voiceLanguage': voiceLanguage,
+      'audioFormat': AudioFormatConfig.audioFormat,
+      'audioFormatName': AudioFormatConfig.getFormatName(AudioFormatConfig.audioFormat),
     };
   }
   
@@ -60,6 +63,7 @@ class VoiceConfig {
     await setUseRemoteVoice(false);
     await setRemoteVoiceUrl(_defaultRemoteUrl);
     await setVoiceLanguage(_defaultLanguage);
+    await AudioFormatConfig.resetToDefault();
     Logger.config('语音识别配置已重置为默认值');
   }
   

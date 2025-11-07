@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../services/voice_config.dart';
 import '../services/remote_voice_service.dart';
+import '../services/audio_format_config.dart';
 import '../helper/my_dialog.dart';
 import '../controller/chat_controller.dart';
 import 'voice_test_screen.dart';
@@ -18,6 +19,7 @@ class _VoiceSettingsScreenState extends State<VoiceSettingsScreen> {
   final _urlController = TextEditingController();
   bool _useRemoteVoice = false;
   String _selectedLanguage = 'auto';
+  String _selectedAudioFormat = 'aac';
   bool _isTestingConnection = false;
   Map<String, dynamic>? _serverInfo;
 
@@ -33,6 +35,7 @@ class _VoiceSettingsScreenState extends State<VoiceSettingsScreen> {
       _useRemoteVoice = VoiceConfig.useRemoteVoice;
       _urlController.text = VoiceConfig.remoteVoiceUrl;
       _selectedLanguage = VoiceConfig.voiceLanguage;
+      _selectedAudioFormat = AudioFormatConfig.audioFormat;
     });
   }
 
@@ -42,6 +45,7 @@ class _VoiceSettingsScreenState extends State<VoiceSettingsScreen> {
       await VoiceConfig.setUseRemoteVoice(_useRemoteVoice);
       await VoiceConfig.setRemoteVoiceUrl(_urlController.text.trim());
       await VoiceConfig.setVoiceLanguage(_selectedLanguage);
+      await AudioFormatConfig.setAudioFormat(_selectedAudioFormat);
       
       // 通知聊天控制器重新加载配置
       try {
@@ -311,6 +315,101 @@ class _VoiceSettingsScreenState extends State<VoiceSettingsScreen> {
                           ),
                         ),
                       ],
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // 音频格式设置
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '录音格式',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        initialValue: _selectedAudioFormat,
+                        decoration: const InputDecoration(
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.audiotrack),
+                        ),
+                        items: AudioFormatConfig.supportedFormats.map((format) {
+                          return DropdownMenuItem<String>(
+                            value: format['code'],
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  format['name']!,
+                                  style: const TextStyle(fontWeight: FontWeight.w500),
+                                ),
+                                Text(
+                                  format['description']!,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          if (value != null) {
+                            setState(() {
+                              _selectedAudioFormat = value;
+                            });
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.info, color: Colors.blue, size: 16),
+                                const SizedBox(width: 8),
+                                Text(
+                                  '格式说明',
+                                  style: TextStyle(
+                                    color: Colors.blue[800],
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              '• AAC格式：高质量压缩，文件小，适合大多数设备\n'
+                              '• WAV格式：无损音质，文件大，兼容性最好\n'
+                              '• PCM转WAV：适用于华为等不支持直接WAV录制的设备',
+                              style: TextStyle(
+                                color: Colors.blue[700],
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                 ),

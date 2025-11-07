@@ -36,7 +36,7 @@ class RemoteVoiceService {
       
       // 检查文件大小（SenseVoice建议不超过30MB）
       final fileSize = await audioFile.length();
-      Logger.voice('音频文件大小: ${fileSize}字节 (${(fileSize / 1024).toStringAsFixed(2)}KB)');
+      Logger.voice('音频文件大小: $fileSize字节 (${(fileSize / 1024).toStringAsFixed(2)}KB)');
       
       if (fileSize == 0) {
         Logger.error('音频文件为空: $audioPath');

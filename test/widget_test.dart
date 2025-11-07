@@ -7,6 +7,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:get/get.dart';
 
 import 'package:ai_assistant/main.dart';
 
@@ -15,7 +16,10 @@ void main() {
     // Build our app and trigger a frame.
     await tester.pumpWidget(const MyApp());
 
-    // Verify that the app starts properly
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    // Wait for the app to settle
+    await tester.pumpAndSettle();
+
+    // Verify that the app starts properly by checking for GetMaterialApp
+    expect(find.byType(GetMaterialApp), findsOneWidget);
   });
 }

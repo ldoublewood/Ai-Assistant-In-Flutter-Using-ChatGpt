@@ -17,7 +17,8 @@ class AppWrite {
 
   static Future<String> getApiKey() async {
     try {
-      // 使用查询方式获取API密钥，避免使用已弃用的getDocument方法
+      // 注意：listDocuments在AppWrite 1.8.0+中已弃用，建议升级到新版本API
+      // 但当前AppWrite SDK版本仍使用此方法，等待SDK更新后再迁移
       final response = await _database.listDocuments(
         databaseId: 'MyDatabase',
         collectionId: 'ApiKey',
