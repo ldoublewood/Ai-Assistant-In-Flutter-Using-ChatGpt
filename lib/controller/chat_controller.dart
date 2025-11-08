@@ -500,6 +500,11 @@ class ChatController extends GetxController {
     Get.toNamed('/voice-settings');
   }
 
+  /// 打开AI提供商设置
+  void openAIProviderSettings() {
+    Get.toNamed('/ai-provider-settings');
+  }
+
   @override
   void onClose() {
     textC.dispose();

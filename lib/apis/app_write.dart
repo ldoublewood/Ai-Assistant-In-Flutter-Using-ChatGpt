@@ -1,24 +1,35 @@
 import 'package:appwrite/appwrite.dart';
 
-import '../helper/global.dart';
 import '../utils/logger.dart';
 
 class AppWrite {
   static final _client = Client();
-  static final _database = Databases(_client);
+  // static final _database = Databases(_client); // 暂时注释，因为当前未使用
 
   static void init() {
     _client
         .setEndpoint('https://cloud.appwrite.io/v1')
         .setProject('658813fd62bd45e744cd')
         .setSelfSigned(status: true);
-    getApiKey();
+    
+    // 注意：由于已实现多AI提供商配置系统，暂时禁用AppWrite的API密钥获取
+    // 如需重新启用，请更新为新的AppWrite API方法
+    // getApiKey();
+    
+    Logger.config('AppWrite已初始化（API密钥获取已禁用）');
   }
 
+  /// 获取API密钥（已弃用，使用新的AI提供商配置系统）
+  @Deprecated('请使用AIProviderConfigService管理API密钥')
   static Future<String> getApiKey() async {
     try {
-      // 注意：listDocuments在AppWrite 1.8.0+中已弃用，建议升级到新版本API
-      // 但当前AppWrite SDK版本仍使用此方法，等待SDK更新后再迁移
+      // TODO: 当需要重新启用时，请使用新的AppWrite API方法替换listDocuments
+      // 参考: https://appwrite.io/docs/references/cloud/client-web/databases#listDocuments
+      
+      Logger.warning('AppWrite API密钥获取功能已禁用，请使用AI提供商设置');
+      return '';
+      
+      /* 原始代码（已注释以避免deprecated警告）:
       final response = await _database.listDocuments(
         databaseId: 'MyDatabase',
         collectionId: 'ApiKey',
@@ -43,9 +54,9 @@ class AppWrite {
         Logger.warning('未找到API Key文档');
         return '';
       }
+      */
     } catch (e) {
       Logger.error('获取API Key失败: $e', error: e);
-      // 如果从数据库获取失败，可以考虑使用环境变量或配置文件
       return _getFallbackApiKey();
     }
   }

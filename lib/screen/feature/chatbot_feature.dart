@@ -25,6 +25,12 @@ class _ChatBotFeatureState extends State<ChatBotFeature> {
         centerTitle: true,
         elevation: 1,
         actions: [
+          // AI提供商设置按钮
+          IconButton(
+            onPressed: () => _c.openAIProviderSettings(),
+            icon: const Icon(Icons.psychology, size: 20),
+            tooltip: 'AI提供商设置',
+          ),
           // 语音设置按钮
           IconButton(
             onPressed: () => _c.openVoiceSettings(),
