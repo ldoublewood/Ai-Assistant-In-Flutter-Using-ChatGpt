@@ -7,10 +7,12 @@ import 'dart:io';
 import '../apis/apis.dart';
 import '../helper/my_dialog.dart';
 import '../model/message.dart';
+import '../model/conversation.dart';
 import '../services/voice_service.dart';
 import '../services/voice_config.dart';
 import '../services/audio_recorder_service.dart';
 import '../services/audio_format_config.dart';
+import '../services/conversation_storage_service.dart';
 import '../utils/logger.dart';
 
 class ChatController extends GetxController {
@@ -27,6 +29,10 @@ class ChatController extends GetxController {
   final RxString recognizedText = ''.obs;
   final RxBool useRemoteVoice = false.obs;
 
+  // 对话历史存储相关
+  String? _currentConversationId;
+  final RxList<ConversationHistoryItem> conversationHistory = <ConversationHistoryItem>[].obs;
+
   final list = <Message>[
     Message(msg: '你好！我是AI助手，有什么可以帮助你的吗？', msgType: MessageType.bot)
   ].obs;
@@ -37,6 +43,7 @@ class ChatController extends GetxController {
     _loadVoiceConfig();
     _initSpeech();
     _initAudioRecorder();
+    _loadConversationHistory();
   }
 
 
@@ -412,6 +419,9 @@ class ChatController extends GetxController {
   /// 发送问题
   Future<void> askQuestion() async {
     if (textC.text.trim().isNotEmpty) {
+      // 生成新的对话ID
+      _currentConversationId = ConversationStorageService.generateConversationId();
+      
       // 用户消息
       list.add(Message(msg: textC.text, msgType: MessageType.user));
       list.add(Message(msg: '', msgType: MessageType.bot));
@@ -421,16 +431,41 @@ class ChatController extends GetxController {
       textC.text = '';
 
       try {
+        // 保存问题到文件
+        await ConversationStorageService.saveQuestion(_currentConversationId!, question);
+        Logger.debug('保存问题成功，对话ID: $_currentConversationId');
+        
         final res = await APIs.getAnswer(question);
         
         // AI回复
         list.removeLast();
         list.add(Message(msg: res, msgType: MessageType.bot));
         _scrollDown();
+        
+        // 保存回答到文件
+        await ConversationStorageService.saveAnswer(_currentConversationId!, res);
+        Logger.debug('保存回答成功，对话ID: $_currentConversationId');
+        
+        // 刷新对话历史列表
+        await _loadConversationHistory();
+        
       } catch (e) {
         list.removeLast();
-        list.add(Message(msg: '抱歉，出现了一些问题，请稍后重试。', msgType: MessageType.bot));
+        final errorMsg = '抱歉，出现了一些问题，请稍后重试。';
+        list.add(Message(msg: errorMsg, msgType: MessageType.bot));
         _scrollDown();
+        
+        // 即使出错也保存回答
+        if (_currentConversationId != null) {
+          try {
+            await ConversationStorageService.saveAnswer(_currentConversationId!, errorMsg);
+            await _loadConversationHistory();
+          } catch (saveError) {
+            Logger.error('保存错误回答失败: $saveError', error: saveError);
+          }
+        }
+        
+        Logger.error('处理问题时出错: $e', error: e);
       }
     } else {
       MyDialog.info('请输入问题或使用语音输入！');
@@ -503,6 +538,154 @@ class ChatController extends GetxController {
   /// 打开AI提供商设置
   void openAIProviderSettings() {
     Get.toNamed('/ai-provider-settings');
+  }
+
+  /// 加载对话历史列表
+  Future<void> _loadConversationHistory() async {
+    try {
+      final history = await ConversationStorageService.getConversationHistory();
+      conversationHistory.assignAll(history);
+      Logger.debug('加载对话历史成功，共 ${history.length} 条记录');
+    } catch (e) {
+      Logger.error('加载对话历史失败: $e', error: e);
+    }
+  }
+
+  /// 加载指定对话
+  Future<void> loadConversation(String conversationId) async {
+    try {
+      final conversation = await ConversationStorageService.loadConversation(conversationId);
+      if (conversation != null) {
+        // 清空当前对话列表
+        list.clear();
+        
+        // 添加欢迎消息
+        list.add(Message(msg: '你好！我是AI助手，有什么可以帮助你的吗？', msgType: MessageType.bot));
+        
+        // 添加历史对话
+        list.add(Message(msg: conversation.question, msgType: MessageType.user));
+        list.add(Message(msg: conversation.answer, msgType: MessageType.bot));
+        
+        // 设置当前对话ID
+        _currentConversationId = conversationId;
+        
+        _scrollDown();
+        Logger.debug('加载对话成功: $conversationId');
+      } else {
+        MyDialog.error('无法加载对话记录');
+      }
+    } catch (e) {
+      Logger.error('加载对话失败: $e', error: e);
+      MyDialog.error('加载对话记录时出错: $e');
+    }
+  }
+
+  /// 删除对话
+  Future<void> deleteConversation(String conversationId) async {
+    try {
+      final success = await ConversationStorageService.deleteConversation(conversationId);
+      if (success) {
+        await _loadConversationHistory();
+        
+        // 如果删除的是当前对话，重置聊天界面
+        if (_currentConversationId == conversationId) {
+          startNewConversation();
+        }
+        
+        MyDialog.info('对话记录已删除');
+        Logger.debug('删除对话成功: $conversationId');
+      } else {
+        MyDialog.error('删除对话记录失败');
+      }
+    } catch (e) {
+      Logger.error('删除对话失败: $e', error: e);
+      MyDialog.error('删除对话记录时出错: $e');
+    }
+  }
+
+  /// 开始新对话
+  void startNewConversation() {
+    _currentConversationId = null;
+    list.clear();
+    list.add(Message(msg: '你好！我是AI助手，有什么可以帮助你的吗？', msgType: MessageType.bot));
+    textC.clear();
+    recognizedText.value = '';
+    _scrollDown();
+    Logger.debug('开始新对话');
+  }
+
+  /// 清空所有对话历史
+  Future<void> clearAllConversations() async {
+    try {
+      final success = await ConversationStorageService.clearAllConversations();
+      if (success) {
+        await _loadConversationHistory();
+        startNewConversation();
+        MyDialog.info('所有对话记录已清空');
+        Logger.debug('清空所有对话历史成功');
+      } else {
+        MyDialog.error('清空对话记录失败');
+      }
+    } catch (e) {
+      Logger.error('清空对话历史失败: $e', error: e);
+      MyDialog.error('清空对话记录时出错: $e');
+    }
+  }
+
+  /// 获取存储统计信息
+  Future<Map<String, dynamic>> getStorageStats() async {
+    try {
+      return await ConversationStorageService.getStorageStats();
+    } catch (e) {
+      Logger.error('获取存储统计信息失败: $e', error: e);
+      return {
+        'conversationCount': 0,
+        'totalFiles': 0,
+        'totalSize': 0,
+        'storagePath': '',
+      };
+    }
+  }
+
+  /// 导出对话历史（可选功能）
+  Future<String?> exportConversationHistory() async {
+    try {
+      final history = await ConversationStorageService.getConversationHistory();
+      if (history.isEmpty) {
+        MyDialog.info('没有对话记录可导出');
+        return null;
+      }
+
+      final buffer = StringBuffer();
+      buffer.writeln('# AI助手对话历史导出');
+      buffer.writeln('导出时间: ${DateTime.now().toString()}');
+      buffer.writeln('总对话数: ${history.length}');
+      buffer.writeln('');
+
+      for (final item in history) {
+        final conversation = await ConversationStorageService.loadConversation(item.id);
+        if (conversation != null) {
+          buffer.writeln('## 对话 ${item.id}');
+          buffer.writeln('时间: ${conversation.createdAt}');
+          buffer.writeln('标题: ${item.title}');
+          buffer.writeln('');
+          buffer.writeln('**问题:**');
+          buffer.writeln(conversation.question);
+          buffer.writeln('');
+          buffer.writeln('**回答:**');
+          buffer.writeln(conversation.answer);
+          buffer.writeln('');
+          buffer.writeln('---');
+          buffer.writeln('');
+        }
+      }
+
+      return buffer.toString();
+    } catch (e) {
+      Logger.error('导出对话历史失败: $e', error: e);
+      MyDialog.error('导出对话历史时出错: $e');
+      return null;
+    }
   }
 
   @override

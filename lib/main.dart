@@ -9,6 +9,7 @@ import 'helper/pref.dart';
 import 'screen/splash_screen.dart';
 import 'screen/voice_settings_screen.dart';
 import 'screen/ai_provider_settings_screen.dart';
+import 'screen/conversation_history_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -49,6 +50,10 @@ class MyApp extends StatelessWidget {
         GetPage(
           name: '/ai-provider-settings',
           page: () => const AIProviderSettingsScreen(),
+        ),
+        GetPage(
+          name: '/conversation-history',
+          page: () => const ConversationHistoryScreen(),
         ),
       ],
 

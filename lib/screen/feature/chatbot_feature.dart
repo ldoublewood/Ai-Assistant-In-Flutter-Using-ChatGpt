@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import '../../controller/chat_controller.dart';
 import '../../helper/global.dart';
 import '../../widget/message_card.dart';
+import '../conversation_history_screen.dart';
 
 class ChatBotFeature extends StatefulWidget {
   const ChatBotFeature({super.key});
@@ -25,39 +26,63 @@ class _ChatBotFeatureState extends State<ChatBotFeature> {
         centerTitle: true,
         elevation: 1,
         actions: [
-          // AI提供商设置按钮
+          // 对话历史按钮
           IconButton(
-            onPressed: () => _c.openAIProviderSettings(),
-            icon: const Icon(Icons.psychology, size: 20),
-            tooltip: 'AI提供商设置',
+            onPressed: () => Get.to(() => const ConversationHistoryScreen()),
+            icon: const Icon(Icons.history, size: 20),
+            tooltip: '对话历史',
           ),
-          // 语音设置按钮
+          // 新对话按钮
           IconButton(
-            onPressed: () => _c.openVoiceSettings(),
-            icon: const Icon(Icons.settings_voice, size: 20),
-            tooltip: '语音设置',
+            onPressed: () => _c.startNewConversation(),
+            icon: const Icon(Icons.add_comment, size: 20),
+            tooltip: '新对话',
           ),
-          // 语音调试按钮
-          IconButton(
-            onPressed: () => _c.checkSpeechAvailability(),
-            icon: const Icon(Icons.mic_external_on, size: 20),
-            tooltip: '检查语音功能',
-          ),
-          // 主题切换按钮
-          IconButton(
-            padding: const EdgeInsets.only(right: 10),
-            onPressed: () {
-              Get.changeThemeMode(
-                _isDarkMode.value ? ThemeMode.light : ThemeMode.dark,
-              );
-              _isDarkMode.value = !_isDarkMode.value;
-            },
-            icon: Obx(() => Icon(
-              _isDarkMode.value
-                  ? Icons.brightness_2_rounded
-                  : Icons.brightness_5_rounded,
-              size: 24,
-            )),
+          // 更多选项菜单
+          PopupMenuButton<String>(
+            onSelected: (value) => _handleMenuAction(value),
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'ai_settings',
+                child: Row(
+                  children: [
+                    Icon(Icons.psychology, size: 18),
+                    SizedBox(width: 8),
+                    Text('AI提供商设置'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'voice_settings',
+                child: Row(
+                  children: [
+                    Icon(Icons.settings_voice, size: 18),
+                    SizedBox(width: 8),
+                    Text('语音设置'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'voice_test',
+                child: Row(
+                  children: [
+                    Icon(Icons.mic_external_on, size: 18),
+                    SizedBox(width: 8),
+                    Text('检查语音功能'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'theme_toggle',
+                child: Row(
+                  children: [
+                    Icon(Icons.brightness_6, size: 18),
+                    SizedBox(width: 8),
+                    Text('切换主题'),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -255,5 +280,26 @@ class _ChatBotFeatureState extends State<ChatBotFeature> {
         ),
       ),
     );
+  }
+
+  /// 处理菜单操作
+  void _handleMenuAction(String value) {
+    switch (value) {
+      case 'ai_settings':
+        _c.openAIProviderSettings();
+        break;
+      case 'voice_settings':
+        _c.openVoiceSettings();
+        break;
+      case 'voice_test':
+        _c.checkSpeechAvailability();
+        break;
+      case 'theme_toggle':
+        Get.changeThemeMode(
+          _isDarkMode.value ? ThemeMode.light : ThemeMode.dark,
+        );
+        _isDarkMode.value = !_isDarkMode.value;
+        break;
+    }
   }
 }
